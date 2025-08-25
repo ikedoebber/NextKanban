@@ -49,7 +49,6 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging, type }
     data: {
       type: 'Task',
       boardId,
-      taskType: type,
     },
   });
 

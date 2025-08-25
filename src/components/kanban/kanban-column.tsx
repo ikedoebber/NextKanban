@@ -30,6 +30,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
     id: board.id,
     data: {
       type: 'Board',
+      boardType: type,
     },
   });
 
