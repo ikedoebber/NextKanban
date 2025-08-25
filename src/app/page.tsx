@@ -130,6 +130,38 @@ export default function Home() {
     );
   };
   
+  const handleMoveTaskToNextBoard = (taskId: string) => {
+    const taskType = taskId.startsWith('goal') ? 'goal' : 'task';
+    const [currentBoards, setBoardsState] = getBoardSetters(taskType);
+
+    let sourceBoardIndex = -1;
+    let sourceTaskIndex = -1;
+
+    for (let i = 0; i < currentBoards.length; i++) {
+        const taskIndex = currentBoards[i].tasks.findIndex(t => t.id === taskId);
+        if (taskIndex !== -1) {
+            sourceBoardIndex = i;
+            sourceTaskIndex = taskIndex;
+            break;
+        }
+    }
+
+    if (sourceBoardIndex === -1 || sourceBoardIndex === currentBoards.length - 1) {
+        return; 
+    }
+
+    const destinationBoardIndex = sourceBoardIndex + 1;
+
+    setBoardsState(prevBoards => {
+        const newBoards = [...prevBoards.map(b => ({...b, tasks: [...b.tasks]}))];
+        const sourceBoard = newBoards[sourceBoardIndex];
+        const destinationBoard = newBoards[destinationBoardIndex];
+        const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
+        destinationBoard.tasks.push(movedTask);
+        return newBoards;
+    });
+  };
+
   const findBoardForTask = (taskId: string, boardsToSearch: Board[]): [Board | undefined, number] => {
     for (const board of boardsToSearch) {
         const taskIndex = board.tasks.findIndex(t => t.id === taskId);
@@ -176,40 +208,32 @@ export default function Home() {
   
     setBoardsState(currentBoards => {
       const [sourceBoard, sourceTaskIndex] = findBoardForTask(activeId, currentBoards);
-      if (!sourceBoard) return currentBoards;
+      if (!sourceBoard || sourceTaskIndex === -1) return currentBoards;
+      
+      let newBoards = JSON.parse(JSON.stringify(currentBoards));
+      const activeBoard = newBoards.find((b: Board) => b.id === sourceBoard.id);
+      if (!activeBoard) return currentBoards;
 
-      let newBoards = [...currentBoards];
-
-      // Cenário 1: Arrastando uma tarefa sobre uma coluna diferente
-      if (overData?.type === 'Board' && over.id !== sourceBoard.id) {
-        const destinationBoard = newBoards.find(b => b.id === over.id);
-        if (destinationBoard && sourceTaskIndex > -1) {
-          const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
-          destinationBoard.tasks.push(movedTask);
-          return newBoards;
-        }
-      }
-
-      // Cenário 2: Arrastando uma tarefa sobre outra tarefa
-      if (overData?.type === 'Task') {
+      const activeTask = activeBoard.tasks.splice(sourceTaskIndex, 1)[0];
+  
+      if (overData?.type === 'Board') {
+        const destinationBoard = newBoards.find((b: Board) => b.id === over.id);
+        destinationBoard.tasks.push(activeTask);
+      } else if (overData?.type === 'Task') {
         const [destinationBoard, destinationTaskIndex] = findBoardForTask(overId, newBoards);
-
-        if (!destinationBoard || sourceTaskIndex === -1 || destinationTaskIndex === -1) {
+        if (!destinationBoard || destinationTaskIndex === -1) {
           return currentBoards;
         }
 
         if (sourceBoard.id === destinationBoard.id) {
-          // Reordenar dentro do mesmo quadro
-          destinationBoard.tasks = arrayMove(destinationBoard.tasks, sourceTaskIndex, destinationTaskIndex);
-        } else {
-          // Mover para um quadro diferente
-          const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
-          destinationBoard.tasks.splice(destinationTaskIndex, 0, movedTask);
-        }
-        return newBoards;
-      }
+            destinationBoard.tasks.splice(destinationTaskIndex, 0, activeTask);
+            newBoards = arrayMove(newBoards, sourceTaskIndex, destinationTaskIndex);
 
-      return currentBoards;
+        } else {
+            destinationBoard.tasks.splice(destinationTaskIndex, 0, activeTask);
+        }
+      }
+      return newBoards;
     });
   };
 
@@ -236,6 +260,7 @@ export default function Home() {
               onAddTask={handleAddTask}
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
+              onMoveTask={handleMoveTaskToNextBoard}
               activeTask={activeTask}
               type="task"
             />
@@ -247,6 +272,7 @@ export default function Home() {
               onAddTask={handleAddTask}
               onEditTask={handleEditTask}
               onDeleteTask={handleDeleteTask}
+              onMoveTask={handleMoveTaskToNextBoard}
               activeTask={activeTask}
               type="goal"
             />

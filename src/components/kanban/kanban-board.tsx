@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { Board, BoardName, Task } from '@/types';
@@ -10,11 +11,12 @@ interface KanbanBoardProps {
   onAddTask: (boardId: BoardName, content: string) => void;
   onEditTask: (taskId: string, newContent: string) => void;
   onDeleteTask: (taskId: string) => void;
+  onMoveTask: (taskId: string) => void;
   activeTask: Task | null;
   type: 'task' | 'goal';
 }
 
-export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, activeTask, type }: KanbanBoardProps) {
+export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, onMoveTask, activeTask, type }: KanbanBoardProps) {
   const boardsId = useMemo(() => boards.map((board) => board.id), [boards]);
 
   return (
@@ -27,6 +29,7 @@ export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, activ
             onAddTask={onAddTask}
             onEditTask={onEditTask}
             onDeleteTask={onDeleteTask}
+            onMoveTask={onMoveTask}
             activeTask={activeTask}
             type={type}
           />

@@ -20,11 +20,12 @@ interface KanbanColumnProps {
   onAddTask: (boardId: BoardName, content: string) => void;
   onEditTask: (taskId: string, newContent: string) => void;
   onDeleteTask: (taskId: string) => void;
+  onMoveTask: (taskId: string) => void;
   activeTask: Task | null;
   type: 'task' | 'goal';
 }
 
-export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activeTask, type }: KanbanColumnProps) {
+export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMoveTask, activeTask, type }: KanbanColumnProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
     id: board.id,
@@ -35,6 +36,15 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
   });
 
   const tasksIds = useMemo(() => board.tasks.map((task) => task.id), [board.tasks]);
+  const isLastColumn = useMemo(() => {
+    if (type === 'task') {
+      return board.id === 'Feito';
+    }
+    if (type === 'goal') {
+      return board.id === 'Anual';
+    }
+    return false;
+  }, [board.id, type]);
 
   const handleAddTask = (content: string) => {
     onAddTask(board.id, content);
@@ -68,6 +78,8 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
                       boardId={board.id}
                       onEdit={onEditTask}
                       onDelete={onDeleteTask}
+                      onMove={onMoveTask}
+                      isLastColumn={isLastColumn}
                       isDragging={activeTask?.id === task.id}
                       type={type}
                     />

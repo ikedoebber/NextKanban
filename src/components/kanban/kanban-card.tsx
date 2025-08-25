@@ -10,6 +10,7 @@ import type { BoardName, Task } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,17 +23,20 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface KanbanCardProps {
   task: Task;
   boardId: BoardName;
   onEdit: (taskId: string, newContent: string) => void;
   onDelete: (taskId: string) => void;
+  onMove: (taskId: string) => void;
+  isLastColumn: boolean;
   isDragging: boolean;
   type: 'task' | 'goal';
 }
 
-export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging, type }: KanbanCardProps) {
+export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColumn, isDragging, type }: KanbanCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(task.content);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +104,20 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging, type }
         >
           <GripVertical className="h-5 w-5" />
         </button>
+        {!isLastColumn && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="pt-1">
+                  <Checkbox id={`check-${task.id}`} onCheckedChange={() => onMove(task.id)} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Mover para o próximo quadro</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
 
         <div className="flex-1 pt-0.5">
           {isEditing ? (
@@ -113,7 +131,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging, type }
             />
           ) : (
             <p
-              className="text-sm min-h-[2rem] flex items-center"
+              className={cn("text-sm min-h-[2rem] flex items-center", isLastColumn && 'pl-2')}
               onClick={() => setIsEditing(true)}
             >
               {task.content}
