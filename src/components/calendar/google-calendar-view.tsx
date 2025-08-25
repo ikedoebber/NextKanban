@@ -46,6 +46,20 @@ const daysOfWeek = [
   'Domingo',
 ];
 
+const generateTimeSlots = () => {
+    const slots = [];
+    for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            const hour = h.toString().padStart(2, '0');
+            const minute = m.toString().padStart(2, '0');
+            slots.push(`${hour}:${minute}`);
+        }
+    }
+    return slots;
+};
+const timeSlots = generateTimeSlots();
+
+
 interface GoogleCalendarViewProps {
   events: CalendarEvent[];
   onAddEvent: (eventData: Omit<CalendarEvent, 'id'>) => void;
@@ -60,13 +74,17 @@ export function GoogleCalendarView({
   onDeleteEvent,
 }: GoogleCalendarViewProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '' });
+  const [newEvent, setNewEvent] = useState({ title: '', date: '', startTime: '', endTime: '' });
 
   const handleAddEventSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (newEvent.title && newEvent.date && newEvent.time) {
-      onAddEvent(newEvent);
-      setNewEvent({ title: '', date: '', time: '' });
+    if (newEvent.title && newEvent.date && newEvent.startTime && newEvent.endTime) {
+      onAddEvent({
+        title: newEvent.title,
+        date: newEvent.date,
+        time: `${newEvent.startTime} - ${newEvent.endTime}`
+      });
+      setNewEvent({ title: '', date: '', startTime: '', endTime: '' });
       setIsAddDialogOpen(false);
     }
   };
@@ -133,18 +151,44 @@ export function GoogleCalendarView({
                   </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="time" className="text-right">
-                    Horário
-                  </Label>
-                  <Input
-                    id="time"
-                    name="time"
-                    placeholder="ex: 10:00 - 11:00"
-                    className="col-span-3"
+                  <Label className="text-right">Início</Label>
+                  <Select
+                    name="startTime"
                     required
-                    value={newEvent.time}
-                    onChange={e => handleNewEventChange('time', e.target.value)}
-                  />
+                    value={newEvent.startTime}
+                    onValueChange={value => handleNewEventChange('startTime', value)}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Selecione o horário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map(time => (
+                        <SelectItem key={`start-${time}`} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label className="text-right">Fim</Label>
+                   <Select
+                    name="endTime"
+                    required
+                    value={newEvent.endTime}
+                    onValueChange={value => handleNewEventChange('endTime', value)}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Selecione o horário" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map(time => (
+                        <SelectItem key={`end-${time}`} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -184,22 +228,35 @@ interface CalendarEventItemProps {
 
 function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedEvent, setEditedEvent] = useState(event);
+  const [editedEvent, setEditedEvent] = useState(() => {
+    const [startTime, endTime] = event.time.split(' - ');
+    return { ...event, startTime, endTime };
+  });
 
   const handleSave = () => {
-    onEdit(event.id, { title: editedEvent.title, date: editedEvent.date, time: editedEvent.time });
+    if (editedEvent.startTime && editedEvent.endTime) {
+      onEdit(event.id, { 
+        title: editedEvent.title, 
+        date: editedEvent.date, 
+        time: `${editedEvent.startTime} - ${editedEvent.endTime}` 
+      });
+    }
     setIsEditing(false);
   };
 
   const handleInputChange = (field: keyof Omit<CalendarEvent, 'id'>, value: string) => {
     setEditedEvent(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleTimeChange = (field: 'startTime' | 'endTime', value: string) => {
+    setEditedEvent(prev => ({...prev, [field]: value}));
+  };
   
   const handleSelectChange = (value: string) => {
-    handleInputChange('date', value)
+    handleInputChange('date', value);
     // We can save immediately on change
-     onEdit(event.id, { ...editedEvent, date: value });
-  }
+    onEdit(event.id, { ...editedEvent, date: value });
+  };
 
   return (
     <div className="group flex items-start gap-4 p-3 rounded-lg bg-secondary/70 hover:bg-secondary transition-colors">
@@ -240,13 +297,26 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
           {isEditing ? (
-            <Input
-              value={editedEvent.time}
-              onChange={e => handleInputChange('time', e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-              className="h-8"
-            />
+            <div className='flex items-center gap-2 w-full'>
+              <Select value={editedEvent.startTime} onValueChange={value => handleTimeChange('startTime', value)}>
+                  <SelectTrigger className="h-8">
+                      <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {timeSlots.map(time => <SelectItem key={`start-edit-${time}`} value={time}>{time}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+              <span>-</span>
+              <Select value={editedEvent.endTime} onValueChange={value => handleTimeChange('endTime', value)}>
+                  <SelectTrigger className="h-8">
+                      <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {timeSlots.map(time => <SelectItem key={`end-edit-${time}`} value={time}>{time}</SelectItem>)}
+                  </SelectContent>
+              </Select>
+              <Button size="sm" onClick={handleSave} className='h-8'>Salvar</Button>
+            </div>
           ) : (
             <span onClick={() => setIsEditing(true)}>{event.time}</span>
           )}
