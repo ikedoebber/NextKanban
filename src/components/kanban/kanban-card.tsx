@@ -104,20 +104,6 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
         >
           <GripVertical className="h-5 w-5" />
         </button>
-        {!isLastColumn && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="pt-1">
-                  <Checkbox id={`check-${task.id}`} onCheckedChange={() => onMove(task.id)} />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Mover para o próximo quadro</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
 
         <div className="flex-1 pt-0.5">
           {isEditing ? (
@@ -131,13 +117,28 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
             />
           ) : (
             <p
-              className={cn("text-sm min-h-[2rem] flex items-center", isLastColumn && 'pl-2')}
+              className={cn("text-sm min-h-[2rem] flex items-center")}
               onClick={() => setIsEditing(true)}
             >
               {task.content}
             </p>
           )}
         </div>
+
+        {!isLastColumn && (
+          <div className="pt-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Checkbox id={`check-${task.id}`} onCheckedChange={() => onMove(task.id)} />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Mover para o próximo quadro</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
 
         <AlertDialog>
           <AlertDialogTrigger asChild>
