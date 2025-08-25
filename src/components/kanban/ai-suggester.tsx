@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -114,7 +115,7 @@ export function AiSuggester({ onSuggested }: AiSuggesterProps) {
                     <SelectValue placeholder="Selecione o contexto" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="task">Tarefa do Projeto</SelectItem>
+                    <SelectItem value="task">Tarefas a fazer</SelectItem>
                     <SelectItem value="goal">Meta</SelectItem>
                   </SelectContent>
                 </Select>
@@ -157,3 +158,5 @@ export function AiSuggester({ onSuggested }: AiSuggesterProps) {
     </Dialog>
   );
 }
+
+    

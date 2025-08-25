@@ -302,7 +302,7 @@ export default function Home() {
         </header>
         <main className="flex-1 overflow-x-auto overflow-y-auto p-6 space-y-8">
           <div>
-            <h2 className="text-2xl font-bold mb-4">Tarefas do Projeto</h2>
+            <h2 className="text-2xl font-bold mb-4">Tarefas a fazer</h2>
             <KanbanBoard
               boards={boards}
               onAddTask={handleAddTask}
@@ -338,5 +338,7 @@ export default function Home() {
     </DndContext>
   );
 }
+
+    
 
     
