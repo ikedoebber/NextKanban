@@ -28,7 +28,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+const daysOfWeek = [
+  'Segunda-feira',
+  'Terça-feira',
+  'Quarta-feira',
+  'Quinta-feira',
+  'Sexta-feira',
+  'Sábado',
+  'Domingo',
+];
 
 interface GoogleCalendarViewProps {
   events: CalendarEvent[];
@@ -44,17 +60,19 @@ export function GoogleCalendarView({
   onDeleteEvent,
 }: GoogleCalendarViewProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '' });
 
-  const handleAddEvent = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddEventSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const title = formData.get('title') as string;
-    const date = formData.get('date') as string;
-    const time = formData.get('time') as string;
-    if (title && date && time) {
-      onAddEvent({ title, date, time });
+    if (newEvent.title && newEvent.date && newEvent.time) {
+      onAddEvent(newEvent);
+      setNewEvent({ title: '', date: '', time: '' });
       setIsAddDialogOpen(false);
     }
+  };
+
+  const handleNewEventChange = (field: keyof typeof newEvent, value: string) => {
+    setNewEvent(prev => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -71,7 +89,7 @@ export function GoogleCalendarView({
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <form onSubmit={handleAddEvent}>
+            <form onSubmit={handleAddEventSubmit}>
               <DialogHeader>
                 <DialogTitle>Adicionar Novo Compromisso</DialogTitle>
                 <DialogDescription>
@@ -83,19 +101,50 @@ export function GoogleCalendarView({
                   <Label htmlFor="title" className="text-right">
                     Título
                   </Label>
-                  <Input id="title" name="title" className="col-span-3" required />
+                  <Input
+                    id="title"
+                    name="title"
+                    className="col-span-3"
+                    required
+                    value={newEvent.title}
+                    onChange={e => handleNewEventChange('title', e.target.value)}
+                  />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="date" className="text-right">
                     Dia
                   </Label>
-                  <Input id="date" name="date" placeholder="ex: Segunda-feira" className="col-span-3" required />
+                  <Select
+                    name="date"
+                    required
+                    value={newEvent.date}
+                    onValueChange={value => handleNewEventChange('date', value)}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Selecione um dia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {daysOfWeek.map(day => (
+                        <SelectItem key={day} value={day}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="time" className="text-right">
                     Horário
                   </Label>
-                  <Input id="time" name="time" placeholder="ex: 10:00 - 11:00" className="col-span-3" required />
+                  <Input
+                    id="time"
+                    name="time"
+                    placeholder="ex: 10:00 - 11:00"
+                    className="col-span-3"
+                    required
+                    value={newEvent.time}
+                    onChange={e => handleNewEventChange('time', e.target.value)}
+                  />
                 </div>
               </div>
               <DialogFooter>
@@ -145,17 +194,29 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
   const handleInputChange = (field: keyof Omit<CalendarEvent, 'id'>, value: string) => {
     setEditedEvent(prev => ({ ...prev, [field]: value }));
   };
+  
+  const handleSelectChange = (value: string) => {
+    handleInputChange('date', value)
+    // We can save immediately on change
+     onEdit(event.id, { ...editedEvent, date: value });
+  }
 
   return (
     <div className="group flex items-start gap-4 p-3 rounded-lg bg-secondary/70 hover:bg-secondary transition-colors">
-      <div className="flex flex-col items-center justify-center h-full p-2 bg-primary/20 rounded-md w-28">
+      <div className="flex flex-col items-center justify-center h-full p-2 bg-primary/20 rounded-md w-28 shrink-0">
         {isEditing ? (
-          <Input
-            value={editedEvent.date}
-            onChange={e => handleInputChange('date', e.target.value)}
-            onBlur={handleSave}
-            className="h-8 text-center"
-          />
+            <Select value={editedEvent.date} onValueChange={handleSelectChange}>
+            <SelectTrigger className="h-8 text-center">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {daysOfWeek.map(day => (
+                <SelectItem key={day} value={day}>
+                  {day}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <p className="font-semibold text-sm text-primary-foreground" onClick={() => setIsEditing(true)}>
             {event.date}
@@ -168,6 +229,7 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
             value={editedEvent.title}
             onChange={e => handleInputChange('title', e.target.value)}
             onBlur={handleSave}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             className="h-8 mb-2"
           />
         ) : (
@@ -182,6 +244,7 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
               value={editedEvent.time}
               onChange={e => handleInputChange('time', e.target.value)}
               onBlur={handleSave}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
               className="h-8"
             />
           ) : (
@@ -213,5 +276,3 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
     </div>
   );
 }
-
-    
