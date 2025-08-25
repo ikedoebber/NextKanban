@@ -9,6 +9,7 @@ import { KanbanBoard } from '@/components/kanban/kanban-board';
 import { AiSuggester } from '@/components/kanban/ai-suggester';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+import { GoogleCalendarView } from '@/components/calendar/google-calendar-view';
 
 const initialBoards: Board[] = [
   { id: 'Não Iniciado', title: 'Não Iniciado', tasks: [
@@ -197,7 +198,6 @@ export default function Home() {
     const activeTaskType = activeId.startsWith('goal') ? 'goal' : 'task';
     const overData = over.data.current;
     
-    // Determina o tipo do 'over' item (seja uma coluna ou outra tarefa)
     const overType = overData?.type === 'Board' ? overData.boardType : (overData?.type === 'Task' ? (overId.startsWith('goal') ? 'goal' : 'task') : undefined);
     
     if (!overType || activeTaskType !== overType) {
@@ -211,26 +211,31 @@ export default function Home() {
       if (!sourceBoard || sourceTaskIndex === -1) return currentBoards;
       
       let newBoards = JSON.parse(JSON.stringify(currentBoards));
-      const activeBoard = newBoards.find((b: Board) => b.id === sourceBoard.id);
-      if (!activeBoard) return currentBoards;
+      let sourceBoardInNew = newBoards.find((b: Board) => b.id === sourceBoard.id);
+      if (!sourceBoardInNew) return currentBoards;
 
-      const activeTask = activeBoard.tasks.splice(sourceTaskIndex, 1)[0];
+      const activeTask = sourceBoardInNew.tasks.splice(sourceTaskIndex, 1)[0];
   
       if (overData?.type === 'Board') {
         const destinationBoard = newBoards.find((b: Board) => b.id === over.id);
-        destinationBoard.tasks.push(activeTask);
+        if(destinationBoard) {
+            destinationBoard.tasks.push(activeTask);
+        }
       } else if (overData?.type === 'Task') {
-        const [destinationBoard, destinationTaskIndex] = findBoardForTask(overId, newBoards);
-        if (!destinationBoard || destinationTaskIndex === -1) {
+        const [overBoard] = findBoardForTask(overId, newBoards);
+        const destinationBoard = newBoards.find((b: Board) => b.id === overBoard?.id);
+        
+        if (!destinationBoard) {
           return currentBoards;
         }
 
-        if (sourceBoard.id === destinationBoard.id) {
-            destinationBoard.tasks.splice(destinationTaskIndex, 0, activeTask);
-            newBoards = arrayMove(newBoards, sourceTaskIndex, destinationTaskIndex);
+        const overTaskIndex = destinationBoard.tasks.findIndex(t => t.id === overId);
 
+        if (sourceBoard.id === destinationBoard.id) {
+            destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
+            
         } else {
-            destinationBoard.tasks.splice(destinationTaskIndex, 0, activeTask);
+            destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
         }
       }
       return newBoards;
@@ -276,6 +281,9 @@ export default function Home() {
               activeTask={activeTask}
               type="goal"
             />
+          </div>
+          <div className="border-t pt-8">
+            <GoogleCalendarView />
           </div>
         </main>
       </div>
