@@ -297,7 +297,7 @@ export default function Home() {
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver} sensors={sensors}>
       <div className="flex flex-col h-full w-full">
         <header className="p-4 border-b flex justify-between items-center bg-card/50 backdrop-blur-sm">
-          <h1 className="text-2xl font-bold font-headline text-primary-foreground/90">NextKanban</h1>
+          <h1 className="text-2xl font-bold font-headline text-primary-foreground/90">DfD Kanban</h1>
           <AiSuggester onSuggested={handleAddTask} />
         </header>
         <main className="flex-1 overflow-x-auto overflow-y-auto p-6 space-y-8">

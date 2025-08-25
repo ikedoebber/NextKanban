@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'DFD Kanban',
+  title: 'DfD Kanban',
   description: 'Uma aplicação de quadro Kanban com tecnologia de IA.',
 };
 
