@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -44,7 +45,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
       <Card
         ref={setNodeRef}
         className={cn(
-          'w-80 shrink-0 h-fit min-h-[10rem] flex flex-col transition-colors duration-300',
+          'w-80 shrink-0 h-fit flex flex-col transition-colors duration-300',
           isOver ? 'bg-primary/10 border-primary' : 'bg-card'
         )}
       >
@@ -55,8 +56,8 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
           </Button>
         </CardHeader>
         <CardContent className="p-2 flex-1">
-          <ScrollArea className="h-[calc(100vh-26rem)]">
-            <div className="flex flex-col gap-2 p-2">
+          <ScrollArea className="max-h-[calc(100vh-26rem)]">
+            <div className="flex flex-col gap-2 p-2 min-h-[6rem]">
               <SortableListContext items={tasksIds}>
                 {board.tasks.length > 0 ? (
                   board.tasks.map(task => (
