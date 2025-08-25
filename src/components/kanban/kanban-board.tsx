@@ -11,9 +11,10 @@ interface KanbanBoardProps {
   onEditTask: (taskId: string, newContent: string) => void;
   onDeleteTask: (taskId: string) => void;
   activeTask: Task | null;
+  type: 'task' | 'goal';
 }
 
-export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, activeTask }: KanbanBoardProps) {
+export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, activeTask, type }: KanbanBoardProps) {
   const boardsId = useMemo(() => boards.map((board) => board.id), [boards]);
 
   return (
@@ -27,6 +28,7 @@ export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, activ
             onEditTask={onEditTask}
             onDeleteTask={onDeleteTask}
             activeTask={activeTask}
+            type={type}
           />
         ))}
       </SortableContext>

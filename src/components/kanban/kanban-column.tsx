@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { useDroppable, SortableContext } from '@dnd-kit/core';
+import { useDroppable } from '@dnd-kit/core';
 import { SortableContext as SortableListContext } from '@dnd-kit/sortable';
 
 import type { Board, BoardName, Task } from '@/types';
@@ -20,9 +20,10 @@ interface KanbanColumnProps {
   onEditTask: (taskId: string, newContent: string) => void;
   onDeleteTask: (taskId: string) => void;
   activeTask: Task | null;
+  type: 'task' | 'goal';
 }
 
-export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activeTask }: KanbanColumnProps) {
+export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activeTask, type }: KanbanColumnProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
     id: board.id,
@@ -54,7 +55,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
           </Button>
         </CardHeader>
         <CardContent className="p-2 flex-1">
-          <ScrollArea className="h-[calc(100vh-18rem)]">
+          <ScrollArea className="h-[calc(100vh-26rem)]">
             <div className="flex flex-col gap-2 p-2">
               <SortableListContext items={tasksIds}>
                 {board.tasks.length > 0 ? (
@@ -66,6 +67,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
                       onEdit={onEditTask}
                       onDelete={onDeleteTask}
                       isDragging={activeTask?.id === task.id}
+                      type={type}
                     />
                   ))
                 ) : (

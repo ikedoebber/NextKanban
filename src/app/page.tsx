@@ -2,15 +2,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BrainCircuit, Plus } from 'lucide-react';
+import { BrainCircuit } from 'lucide-react';
 
 import type { Board, Task, BoardName } from '@/types';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
 import { AiSuggester } from '@/components/kanban/ai-suggester';
-import { AddTaskDialog } from '@/components/kanban/add-task-dialog';
-import { Button } from '@/components/ui/button';
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, Active, Over } from '@dnd-kit/core';
-import { SortableContext, arrayMove } from '@dnd-kit/sortable';
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 
 const initialBoards: Board[] = [
   { id: 'Não Iniciado', title: 'Não Iniciado', tasks: [
@@ -29,8 +27,25 @@ const initialBoards: Board[] = [
   ] },
 ];
 
+const initialGoalsBoards: Board[] = [
+  { id: 'Semanal', title: 'Semanal', tasks: [
+      { id: 'goal-1', content: 'Correr 5km' },
+  ]},
+  { id: 'Mensal', title: 'Mensal', tasks: [
+      { id: 'goal-2', content: 'Ler 2 livros' },
+  ] },
+  { id: 'Trimestral', title: 'Trimestral', tasks: [
+      { id: 'goal-3', content: 'Aprender uma nova habilidade' },
+  ] },
+  { id: 'Anual', title: 'Anual', tasks: [
+      { id: 'goal-4', content: 'Viajar para um novo país' },
+  ] },
+];
+
 export default function Home() {
   const [boards, setBoards] = useState<Board[]>([]);
+  const [goalsBoards, setGoalsBoards] = useState<Board[]>([]);
+
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -38,6 +53,7 @@ export default function Home() {
   useEffect(() => {
     setIsClient(true);
     setBoards(initialBoards);
+    setGoalsBoards(initialGoalsBoards);
   }, []);
 
   const sensors = useSensors(
@@ -48,14 +64,20 @@ export default function Home() {
     })
   );
 
+  const getBoardSetters = (type?: string) => {
+    return type === 'goal' ? [goalsBoards, setGoalsBoards] as const : [boards, setBoards] as const;
+  }
+
   const handleAddTask = (boardId: BoardName, content: string) => {
     if (!content) return;
+    const isGoal = initialGoalsBoards.some(b => b.id === boardId);
+    const [currentBoards, setBoardsState] = getBoardSetters(isGoal ? 'goal' : 'task');
     const newTask: Task = {
-      id: `task-${Date.now()}`,
+      id: `${isGoal ? 'goal' : 'task'}-${Date.now()}`,
       content,
     };
-    setBoards(boards =>
-      boards.map(board =>
+    setBoardsState(currentBoards =>
+      currentBoards.map(board =>
         board.id === boardId
           ? { ...board, tasks: [...board.tasks, newTask] }
           : board
@@ -64,7 +86,8 @@ export default function Home() {
   };
 
   const handleEditTask = (taskId: string, newContent: string) => {
-    setBoards(boards =>
+    const [currentBoards, setBoardsState] = getBoardSetters(taskId.startsWith('goal') ? 'goal' : 'task');
+    setBoardsState(boards =>
       boards.map(board => ({
         ...board,
         tasks: board.tasks.map(task =>
@@ -75,7 +98,8 @@ export default function Home() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    setBoards(boards =>
+    const [currentBoards, setBoardsState] = getBoardSetters(taskId.startsWith('goal') ? 'goal' : 'task');
+    setBoardsState(boards =>
       boards.map(board => ({
         ...board,
         tasks: board.tasks.filter(task => task.id !== taskId),
@@ -83,17 +107,17 @@ export default function Home() {
     );
   };
   
-  const findBoard = (boardId: BoardName | string) => {
-    return boards.find(board => board.id === boardId);
+  const findBoard = (boardId: BoardName | string, type?: string) => {
+    const [sourceBoards] = getBoardSetters(type);
+    return sourceBoards.find(board => board.id === boardId);
   }
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const { id } = active;
-    const { boardId } = active.data.current || {};
+    const { boardId, type } = active.data.current || {};
     
-    // Find the board and the task being dragged
-    const board = findBoard(boardId as BoardName);
+    const board = findBoard(boardId, type);
     if (!board) return;
     
     const task = board.tasks.find(t => t.id === id);
@@ -107,65 +131,77 @@ export default function Home() {
     const { active, over } = event;
     if (!over) return;
   
-    const activeId = active.id;
-    const overId = over.id;
+    const activeId = active.id as string;
+    const overId = over.id as string;
   
     if (activeId === overId) return;
+
+    const { type: activeType } = active.data.current || {};
+    const { type: overType } = over.data.current || {};
+
+    if (activeType !== overType && overType) {
+        return;
+    }
+
+    const [currentBoards, setBoardsState] = getBoardSetters(activeType);
   
     const isActiveATask = active.data.current?.type === 'Task';
     const isOverAColumn = over.data.current?.type === 'Board';
   
-    // Handle task dragging over a column
     if (isActiveATask && isOverAColumn) {
-      setBoards(boards => {
-        const activeBoard = findBoard(active.data.current!.boardId as BoardName);
-        const overBoard = findBoard(overId as BoardName);
-  
-        if (!activeBoard || !overBoard || activeBoard.id === overBoard.id) {
-          return boards;
-        }
-  
-        const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
-        if (activeTaskIndex === -1) {
-            return boards;
-        }
-
-        const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
-        overBoard.tasks.push(movedTask);
-        
-        active.data.current!.boardId = overBoard.id;
-
-        return [...boards];
-      });
+        setBoardsState(boards => {
+            const activeBoardId = active.data.current!.boardId;
+            const overBoardId = overId;
+    
+            const activeBoard = boards.find(b => b.id === activeBoardId);
+            const overBoard = boards.find(b => b.id === overBoardId);
+    
+            if (!activeBoard || !overBoard || activeBoard.id === overBoard.id) {
+                return boards;
+            }
+    
+            const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+            if (activeTaskIndex === -1) {
+                return boards;
+            }
+    
+            const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
+            overBoard.tasks.push(movedTask);
+            active.data.current!.boardId = overBoard.id;
+    
+            return [...boards];
+        });
     }
   
     const isOverATask = over.data.current?.type === 'Task';
   
-    // Handle task dragging over another task
     if (isActiveATask && isOverATask) {
-      setBoards(boards => {
-        const activeBoard = findBoard(active.data.current!.boardId as BoardName);
-        const overBoard = findBoard(over.data.current!.boardId as BoardName);
-  
-        if (!activeBoard || !overBoard) {
-            return boards;
-        }
-
-        if (activeBoard.id === overBoard.id) {
-            const activeIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
-            const overIndex = overBoard.tasks.findIndex(t => t.id === overId);
-            activeBoard.tasks = arrayMove(activeBoard.tasks, activeIndex, overIndex);
-        } else {
-            const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
-            const overTaskIndex = overBoard.tasks.findIndex(t => t.id === overId);
-
-            const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
-            overBoard.tasks.splice(overTaskIndex, 0, movedTask);
-            active.data.current!.boardId = overBoard.id;
-        }
-
-        return [...boards];
-      });
+        setBoardsState(boards => {
+            const activeBoardId = active.data.current!.boardId;
+            const overBoardId = over.data.current!.boardId;
+    
+            const activeBoard = boards.find(b => b.id === activeBoardId);
+            const overBoard = boards.find(b => b.id === overBoardId);
+    
+            if (!activeBoard || !overBoard) {
+                return boards;
+            }
+    
+            if (activeBoard.id === overBoard.id) {
+                const activeIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+                const overIndex = overBoard.tasks.findIndex(t => t.id === overId);
+                activeBoard.tasks = arrayMove(activeBoard.tasks, activeIndex, overIndex);
+            } else {
+                const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+                const overTaskIndex = overBoard.tasks.findIndex(t => t.id === overId);
+    
+                const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
+                overBoard.tasks.splice(overTaskIndex, 0, movedTask);
+                active.data.current!.boardId = overBoard.id;
+            }
+    
+            return [...boards];
+        });
     }
   };
 
@@ -185,14 +221,29 @@ export default function Home() {
           <h1 className="text-2xl font-bold font-headline text-primary-foreground/90">NextKanban</h1>
           <AiSuggester onSuggested={handleAddTask} />
         </header>
-        <main className="flex-1 overflow-x-auto overflow-y-hidden p-6">
-          <KanbanBoard
-            boards={boards}
-            onAddTask={handleAddTask}
-            onEditTask={handleEditTask}
-            onDeleteTask={handleDeleteTask}
-            activeTask={activeTask}
-          />
+        <main className="flex-1 overflow-x-auto overflow-y-auto p-6 space-y-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Tarefas do Projeto</h2>
+            <KanbanBoard
+              boards={boards}
+              onAddTask={handleAddTask}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              activeTask={activeTask}
+              type="task"
+            />
+          </div>
+          <div className="border-t pt-8">
+            <h2 className="text-2xl font-bold mb-4">Metas</h2>
+             <KanbanBoard
+              boards={goalsBoards}
+              onAddTask={handleAddTask}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              activeTask={activeTask}
+              type="goal"
+            />
+          </div>
         </main>
       </div>
     </DndContext>

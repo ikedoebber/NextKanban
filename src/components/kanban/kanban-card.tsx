@@ -29,9 +29,10 @@ interface KanbanCardProps {
   onEdit: (taskId: string, newContent: string) => void;
   onDelete: (taskId: string) => void;
   isDragging: boolean;
+  type: 'task' | 'goal';
 }
 
-export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: KanbanCardProps) {
+export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging, type }: KanbanCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(task.content);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +49,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: Kanb
     data: {
       type: 'Task',
       boardId,
+      taskType: type,
     },
   });
 
