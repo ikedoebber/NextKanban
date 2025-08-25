@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,8 +9,8 @@ import { KanbanBoard } from '@/components/kanban/kanban-board';
 import { AiSuggester } from '@/components/kanban/ai-suggester';
 import { AddTaskDialog } from '@/components/kanban/add-task-dialog';
 import { Button } from '@/components/ui/button';
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { SortableContext } from '@dnd-kit/sortable';
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, Active, Over } from '@dnd-kit/core';
+import { SortableContext, arrayMove } from '@dnd-kit/sortable';
 
 const initialBoards: Board[] = [
   { id: 'Not Started', title: 'Not Started', tasks: [
@@ -90,54 +91,77 @@ export default function Home() {
     const { active } = event;
     const { id } = active;
     const { boardId } = active.data.current || {};
-    const board = findBoard(boardId);
+    
+    // Find the board and the task being dragged
+    const board = findBoard(boardId as BoardName);
     if (!board) return;
-
+    
+    const task = board.tasks.find(t => t.id === id);
+    if (!task) return;
+  
     setActiveBoard(board);
-    setActiveTask(board.tasks.find(task => task.id === id) || null);
+    setActiveTask(task);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
-
+  
     const activeId = active.id;
     const overId = over.id;
-
+  
     if (activeId === overId) return;
-
+  
     const isActiveATask = active.data.current?.type === 'Task';
-    const isOverATask = over.data.current?.type === 'Task';
-    
-    if (isActiveATask) {
+    const isOverAColumn = over.data.current?.type === 'Board';
+  
+    // Handle task dragging over a column
+    if (isActiveATask && isOverAColumn) {
       setBoards(boards => {
-        const activeBoardId = active.data.current?.boardId;
-        const overBoardId = over.data.current?.boardId || over.id;
-        
-        const activeBoard = findBoard(activeBoardId);
-        const overBoard = findBoard(overBoardId);
-
-        if (!activeBoard || !overBoard || activeBoardId === overBoardId) {
+        const activeBoard = findBoard(active.data.current!.boardId as BoardName);
+        const overBoard = findBoard(overId as BoardName);
+  
+        if (!activeBoard || !overBoard || activeBoard.id === overBoard.id) {
           return boards;
         }
-
-        let newBoards = [...boards];
+  
         const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
-        
         if (activeTaskIndex === -1) {
             return boards;
         }
+
+        const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
+        overBoard.tasks.push(movedTask);
         
-        const [movedTask] = newBoards.find(b => b.id === activeBoardId)!.tasks.splice(activeTaskIndex, 1);
-        
-        if (!movedTask) {
+        return [...boards];
+      });
+    }
+  
+    const isOverATask = over.data.current?.type === 'Task';
+  
+    // Handle task dragging over another task
+    if (isActiveATask && isOverATask) {
+      setBoards(boards => {
+        const activeBoard = findBoard(active.data.current!.boardId as BoardName);
+        const overBoard = findBoard(over.data.current!.boardId as BoardName);
+  
+        if (!activeBoard || !overBoard) {
             return boards;
         }
 
-        const overTaskIndex = isOverATask ? overBoard.tasks.findIndex(t => t.id === overId) : overBoard.tasks.length;
-        newBoards.find(b => b.id === overBoardId)!.tasks.splice(overTaskIndex, 0, movedTask);
+        if (activeBoard.id === overBoard.id) {
+            const activeIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+            const overIndex = overBoard.tasks.findIndex(t => t.id === overId);
+            activeBoard.tasks = arrayMove(activeBoard.tasks, activeIndex, overIndex);
+        } else {
+            const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+            const overTaskIndex = overBoard.tasks.findIndex(t => t.id === overId);
 
-        return newBoards;
+            const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
+            overBoard.tasks.splice(overTaskIndex, 0, movedTask);
+        }
+
+        return [...boards];
       });
     }
   };
