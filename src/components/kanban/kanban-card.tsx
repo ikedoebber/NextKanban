@@ -1,0 +1,148 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Trash2, GripVertical } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+import type { BoardName, Task } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
+
+interface KanbanCardProps {
+  task: Task;
+  boardId: BoardName;
+  onEdit: (taskId: string, newContent: string) => void;
+  onDelete: (taskId: string) => void;
+  isDragging: boolean;
+}
+
+export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: KanbanCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [content, setContent] = useState(task.content);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isOver,
+  } = useSortable({
+    id: task.id,
+    data: {
+      type: 'Task',
+      boardId,
+    },
+  });
+
+  const style = {
+    transition,
+    transform: CSS.Transform.toString(transform),
+  };
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+  
+  const handleSave = () => {
+    if (content.trim() && content.trim() !== task.content) {
+      onEdit(task.id, content.trim());
+    } else {
+      setContent(task.content);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      setContent(task.content);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'group relative touch-none',
+        isDragging ? 'opacity-50 shadow-2xl z-50' : 'shadow-sm',
+        isOver && !isDragging && 'ring-2 ring-primary'
+      )}
+    >
+      <CardContent className="p-3 flex items-center gap-2">
+        <button
+          {...attributes}
+          {...listeners}
+          className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          aria-label="Drag handle"
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+
+        {isEditing ? (
+          <Input
+            ref={inputRef}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="h-8"
+          />
+        ) : (
+          <p
+            className="flex-1 text-sm cursor-pointer"
+            onClick={() => setIsEditing(true)}
+          >
+            {task.content}
+          </p>
+        )}
+
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete this task.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(task.id)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
+}
