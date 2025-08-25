@@ -1,3 +1,4 @@
+
 export interface Task {
   id: string;
   content: string;
@@ -10,3 +11,12 @@ export interface Board {
   title: string;
   tasks: Task[];
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  time: string;
+  date: string;
+}
+
+    

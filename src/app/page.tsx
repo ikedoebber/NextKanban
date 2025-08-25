@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { BrainCircuit } from 'lucide-react';
 
-import type { Board, Task, BoardName } from '@/types';
+import type { Board, Task, BoardName, CalendarEvent } from '@/types';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
 import { AiSuggester } from '@/components/kanban/ai-suggester';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -43,9 +43,18 @@ const initialGoalsBoards: Board[] = [
   ] },
 ];
 
+const initialCalendarEvents: CalendarEvent[] = [
+  { id: 'evt1', title: 'Reunião de planejamento de sprint', time: '10:00 - 11:00', date: 'Segunda-feira' },
+  { id: 'evt2', title: 'Entrevista com candidato', time: '14:00 - 15:00', date: 'Terça-feira' },
+  { id: 'evt3', title: 'Revisão de design com a equipe', time: '11:00 - 12:30', date: 'Quarta-feira' },
+  { id: 'evt4', title: 'Foco no desenvolvimento', time: '09:00 - 17:00', date: 'Quinta-feira' },
+  { id: 'evt5', title: 'Demonstração do produto', time: '15:00 - 16:00', date: 'Sexta-feira' },
+];
+
 export default function Home() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [goalsBoards, setGoalsBoards] = useState<Board[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -55,6 +64,8 @@ export default function Home() {
     // Em um aplicativo real, você buscaria isso de um armazenamento persistente
     const savedBoards = localStorage.getItem('kanbanBoards');
     const savedGoalsBoards = localStorage.getItem('goalsBoards');
+    const savedCalendarEvents = localStorage.getItem('calendarEvents');
+
     if (savedBoards) {
       setBoards(JSON.parse(savedBoards));
     } else {
@@ -64,6 +75,11 @@ export default function Home() {
       setGoalsBoards(JSON.parse(savedGoalsBoards));
     } else {
       setGoalsBoards(initialGoalsBoards);
+    }
+    if (savedCalendarEvents) {
+      setCalendarEvents(JSON.parse(savedCalendarEvents));
+    } else {
+      setCalendarEvents(initialCalendarEvents);
     }
   }, []);
 
@@ -78,6 +94,12 @@ export default function Home() {
       localStorage.setItem('goalsBoards', JSON.stringify(goalsBoards));
     }
   }, [goalsBoards, isClient]);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+    }
+  }, [calendarEvents, isClient]);
 
 
   const sensors = useSensors(
@@ -245,6 +267,27 @@ export default function Home() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveTask(null);
   };
+  
+  const handleAddEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
+    const newEvent: CalendarEvent = {
+      id: `evt-${Date.now()}`,
+      ...eventData
+    };
+    setCalendarEvents(prev => [...prev, newEvent]);
+  };
+
+  const handleEditEvent = (eventId: string, updatedData: Partial<Omit<CalendarEvent, 'id'>>) => {
+    setCalendarEvents(prev =>
+      prev.map(event =>
+        event.id === eventId ? { ...event, ...updatedData } : event
+      )
+    );
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    setCalendarEvents(prev => prev.filter(event => event.id !== eventId));
+  };
+
 
   if (!isClient) {
     return null; // ou um esqueleto de carregamento
@@ -283,10 +326,17 @@ export default function Home() {
             />
           </div>
           <div className="border-t pt-8">
-            <GoogleCalendarView />
+            <GoogleCalendarView 
+              events={calendarEvents}
+              onAddEvent={handleAddEvent}
+              onEditEvent={handleEditEvent}
+              onDeleteEvent={handleDeleteEvent}
+            />
           </div>
         </main>
       </div>
     </DndContext>
   );
 }
+
+    
