@@ -123,8 +123,17 @@ export default function Home() {
 
         let newBoards = [...boards];
         const activeTaskIndex = activeBoard.tasks.findIndex(t => t.id === activeId);
+        
+        if (activeTaskIndex === -1) {
+            return boards;
+        }
+        
         const [movedTask] = newBoards.find(b => b.id === activeBoardId)!.tasks.splice(activeTaskIndex, 1);
         
+        if (!movedTask) {
+            return boards;
+        }
+
         const overTaskIndex = isOverATask ? overBoard.tasks.findIndex(t => t.id === overId) : overBoard.tasks.length;
         newBoards.find(b => b.id === overBoardId)!.tasks.splice(overTaskIndex, 0, movedTask);
 
