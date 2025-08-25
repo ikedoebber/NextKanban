@@ -26,7 +26,7 @@ interface AiSuggesterProps {
 }
 
 const formSchema = z.object({
-  taskDescription: z.string().min(5, 'Task description must be at least 5 characters long.'),
+  taskDescription: z.string().min(5, 'A descrição da tarefa deve ter pelo menos 5 caracteres.'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -48,11 +48,11 @@ export function AiSuggester({ onSuggested }: AiSuggesterProps) {
       const result = await suggestBoardPlacement({ taskDescription: data.taskDescription });
       setSuggestion(result);
     } catch (error) {
-      console.error('Failed to get AI suggestion:', error);
+      console.error('Falha ao obter sugestão da IA:', error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Could not get AI suggestion. Please try again.',
+        title: 'Erro',
+        description: 'Não foi possível obter a sugestão da IA. Por favor, tente novamente.',
       });
     } finally {
       setIsLoading(false);
@@ -77,46 +77,46 @@ export function AiSuggester({ onSuggested }: AiSuggesterProps) {
       <DialogTrigger asChild>
         <Button>
           <BrainCircuit className="mr-2 h-4 w-4" />
-          Suggest Task
+          Sugerir Tarefa
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>AI Task Suggester</DialogTitle>
+          <DialogTitle>Sugestão de Tarefas por IA</DialogTitle>
           <DialogDescription>
-            Describe a task, and our AI will suggest which board it belongs on.
+            Descreva uma tarefa e nossa IA irá sugerir em qual quadro ela pertence.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(getSuggestion)} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="taskDescription">Task Description</Label>
+            <Label htmlFor="taskDescription">Descrição da Tarefa</Label>
             <Controller
               name="taskDescription"
               control={control}
               render={({ field }) => (
-                <Textarea id="taskDescription" placeholder="e.g., Implement user authentication" {...field} />
+                <Textarea id="taskDescription" placeholder="ex.: Implementar autenticação de usuário" {...field} />
               )}
             />
           </div>
           <Button type="submit" disabled={isLoading} className="w-full">
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-            Get Suggestion
+            Obter Sugestão
           </Button>
         </form>
         {suggestion && (
           <div className="mt-4 space-y-4 rounded-md border bg-secondary/50 p-4">
-            <h4 className="font-semibold">Suggestion</h4>
+            <h4 className="font-semibold">Sugestão</h4>
             <p>
-              Board: <span className="font-bold text-accent">{suggestion.suggestedBoard}</span>
+              Quadro: <span className="font-bold text-accent">{suggestion.suggestedBoard}</span>
             </p>
             <p>
-              Reasoning: <span className="italic text-muted-foreground">{suggestion.reasoning}</span>
+              Justificativa: <span className="italic text-muted-foreground">{suggestion.reasoning}</span>
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={resetAndClose}>
-                Cancel
+                Cancelar
               </Button>
-              <Button onClick={handleAcceptSuggestion}>Accept & Add Task</Button>
+              <Button onClick={handleAcceptSuggestion}>Aceitar e Adicionar Tarefa</Button>
             </DialogFooter>
           </div>
         )}

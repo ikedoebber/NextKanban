@@ -13,19 +13,19 @@ import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor,
 import { SortableContext, arrayMove } from '@dnd-kit/sortable';
 
 const initialBoards: Board[] = [
-  { id: 'Not Started', title: 'Not Started', tasks: [
-    { id: 'task-1', content: 'Design the main UI' },
-    { id: 'task-2', content: 'Setup project structure' },
+  { id: 'Não Iniciado', title: 'Não Iniciado', tasks: [
+    { id: 'task-1', content: 'Projetar a interface do usuário principal' },
+    { id: 'task-2', content: 'Configurar a estrutura do projeto' },
   ]},
-  { id: 'To Do', title: 'To Do', tasks: [
-    { id: 'task-3', content: 'Develop the Kanban board component' },
-    { id: 'task-4', content: 'Implement drag-and-drop functionality' },
+  { id: 'A Fazer', title: 'A Fazer', tasks: [
+    { id: 'task-3', content: 'Desenvolver o componente do quadro Kanban' },
+    { id: 'task-4', content: 'Implementar a funcionalidade de arrastar e soltar' },
   ] },
-  { id: 'Doing', title: 'Doing', tasks: [
-    { id: 'task-5', content: 'Integrate AI task suggestion feature' },
+  { id: 'Fazendo', title: 'Fazendo', tasks: [
+    { id: 'task-5', content: 'Integrar o recurso de sugestão de tarefas de IA' },
   ] },
-  { id: 'Done', title: 'Done', tasks: [
-    { id: 'task-6', content: 'Deploy the application' },
+  { id: 'Feito', title: 'Feito', tasks: [
+    { id: 'task-6', content: 'Implantar a aplicação' },
   ] },
 ];
 
@@ -133,6 +133,8 @@ export default function Home() {
         const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
         overBoard.tasks.push(movedTask);
         
+        active.data.current!.boardId = overBoard.id;
+
         return [...boards];
       });
     }
@@ -159,6 +161,7 @@ export default function Home() {
 
             const [movedTask] = activeBoard.tasks.splice(activeTaskIndex, 1);
             overBoard.tasks.splice(overTaskIndex, 0, movedTask);
+            active.data.current!.boardId = overBoard.id;
         }
 
         return [...boards];

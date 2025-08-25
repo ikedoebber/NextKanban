@@ -14,15 +14,15 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestBoardPlacementInputSchema = z.object({
-  taskDescription: z.string().describe('The description of the task.'),
+  taskDescription: z.string().describe('A descrição da tarefa.'),
 });
 export type SuggestBoardPlacementInput = z.infer<typeof SuggestBoardPlacementInputSchema>;
 
 const SuggestBoardPlacementOutputSchema = z.object({
   suggestedBoard: z
-    .enum(['To Do', 'Doing', 'Done', 'Not Started'])
-    .describe('The suggested board for the task.'),
-  reasoning: z.string().describe('The reasoning behind the board suggestion.'),
+    .enum(['A Fazer', 'Fazendo', 'Feito', 'Não Iniciado'])
+    .describe('O quadro sugerido para a tarefa.'),
+  reasoning: z.string().describe('A justificativa para a sugestão de quadro.'),
 });
 export type SuggestBoardPlacementOutput = z.infer<typeof SuggestBoardPlacementOutputSchema>;
 
@@ -36,13 +36,13 @@ const prompt = ai.definePrompt({
   name: 'suggestBoardPlacementPrompt',
   input: {schema: SuggestBoardPlacementInputSchema},
   output: {schema: SuggestBoardPlacementOutputSchema},
-  prompt: `You are an AI assistant helping users organize their tasks on a Kanban board.
+  prompt: `Você é um assistente de IA que ajuda os usuários a organizar suas tarefas em um quadro Kanban.
 
-The Kanban board has four columns: To Do, Doing, Done, and Not Started.
+O quadro Kanban tem quatro colunas: A Fazer, Fazendo, Feito e Não Iniciado.
 
-Given the following task description, suggest which board the task should be placed on and explain your reasoning.
+Dada a seguinte descrição da tarefa, sugira em qual quadro a tarefa deve ser colocada e explique seu raciocínio.
 
-Task Description: {{{taskDescription}}}`,
+Descrição da Tarefa: {{{taskDescription}}}`,
 });
 
 const suggestBoardPlacementFlow = ai.defineFlow(

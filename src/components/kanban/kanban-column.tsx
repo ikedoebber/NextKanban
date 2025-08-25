@@ -69,7 +69,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, activ
                     />
                   ))
                 ) : (
-                  <div className="text-center text-sm text-muted-foreground py-4">No tasks yet.</div>
+                  <div className="text-center text-sm text-muted-foreground py-4">Nenhuma tarefa ainda.</div>
                 )}
               </SortableListContext>
             </div>

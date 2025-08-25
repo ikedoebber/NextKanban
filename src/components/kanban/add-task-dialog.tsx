@@ -36,26 +36,26 @@ export function AddTaskDialog({ isOpen, onOpenChange, onAddTask, boardName }: Ad
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add a new task to {boardName}</DialogTitle>
-            <DialogDescription>Enter the details for your new task below.</DialogDescription>
+            <DialogTitle>Adicionar uma nova tarefa a {boardName}</DialogTitle>
+            <DialogDescription>Insira os detalhes da sua nova tarefa abaixo.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="task-content" className="text-right">
-                Task
+                Tarefa
               </Label>
               <Input
                 id="task-content"
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 className="col-span-3"
-                placeholder="e.g., Finalize project report"
+                placeholder="ex.: Finalizar relatório do projeto"
                 autoFocus
               />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Add Task</Button>
+            <Button type="submit">Adicionar Tarefa</Button>
           </DialogFooter>
         </form>
       </DialogContent>

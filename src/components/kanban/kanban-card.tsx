@@ -85,9 +85,9 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: Kanb
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative touch-none bg-card hover:shadow-md transition-shadow duration-200',
-        isDragging ? 'opacity-75 shadow-2xl z-50' : 'shadow',
-        isOver && !isDragging && 'ring-2 ring-primary'
+        "group relative touch-none bg-card hover:shadow-lg transition-all duration-200 ease-in-out hover:-translate-y-1",
+        isDragging ? "opacity-75 shadow-2xl z-50 transform-none" : "shadow-md",
+        isOver && !isDragging && "ring-2 ring-primary"
       )}
     >
       <CardContent className="p-3 flex items-start gap-2">
@@ -95,7 +95,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: Kanb
           {...attributes}
           {...listeners}
           className="p-1 -ml-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-          aria-label="Drag handle"
+          aria-label="Alça de arrastar"
         >
           <GripVertical className="h-5 w-5" />
         </button>
@@ -132,15 +132,15 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, isDragging }: Kanb
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete this task.
+                Esta ação não pode ser desfeita. Isso excluirá permanentemente esta tarefa.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={() => onDelete(task.id)}>
-                Delete
+                Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

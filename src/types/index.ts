@@ -3,7 +3,7 @@ export interface Task {
   content: string;
 }
 
-export type BoardName = 'Not Started' | 'To Do' | 'Doing' | 'Done';
+export type BoardName = 'Não Iniciado' | 'A Fazer' | 'Fazendo' | 'Feito';
 
 export interface Board {
   id: BoardName;
