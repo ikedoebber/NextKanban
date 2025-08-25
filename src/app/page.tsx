@@ -51,9 +51,33 @@ export default function Home() {
 
   useEffect(() => {
     setIsClient(true);
-    setBoards(initialBoards);
-    setGoalsBoards(initialGoalsBoards);
+    // Em um aplicativo real, você buscaria isso de um armazenamento persistente
+    const savedBoards = localStorage.getItem('kanbanBoards');
+    const savedGoalsBoards = localStorage.getItem('goalsBoards');
+    if (savedBoards) {
+      setBoards(JSON.parse(savedBoards));
+    } else {
+      setBoards(initialBoards);
+    }
+    if (savedGoalsBoards) {
+      setGoalsBoards(JSON.parse(savedGoalsBoards));
+    } else {
+      setGoalsBoards(initialGoalsBoards);
+    }
   }, []);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem('kanbanBoards', JSON.stringify(boards));
+    }
+  }, [boards, isClient]);
+
+  useEffect(() => {
+    if (isClient) {
+      localStorage.setItem('goalsBoards', JSON.stringify(goalsBoards));
+    }
+  }, [goalsBoards, isClient]);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -70,7 +94,7 @@ export default function Home() {
   const handleAddTask = (boardId: BoardName, content: string) => {
     if (!content) return;
     const isGoal = initialGoalsBoards.some(b => b.id === boardId);
-    const [currentBoards, setBoardsState] = getBoardSetters(isGoal ? 'goal' : 'task');
+    const [, setBoardsState] = getBoardSetters(isGoal ? 'goal' : 'task');
     const newTask: Task = {
       id: `${isGoal ? 'goal' : 'task'}-${Date.now()}`,
       content,
@@ -106,23 +130,24 @@ export default function Home() {
     );
   };
   
-  const findBoardForTask = (taskId: string): [Board[] | undefined, Board | undefined, number] => {
-    const taskType = taskId.startsWith('goal') ? 'goal' : 'task';
-    const [sourceBoards] = getBoardSetters(taskType);
-    for (const board of sourceBoards) {
+  const findBoardForTask = (taskId: string, boardsToSearch: Board[]): [Board | undefined, number] => {
+    for (const board of boardsToSearch) {
         const taskIndex = board.tasks.findIndex(t => t.id === taskId);
         if (taskIndex !== -1) {
-            return [sourceBoards, board, taskIndex];
+            return [board, taskIndex];
         }
     }
-    return [undefined, undefined, -1];
+    return [undefined, -1];
   }
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const { id } = active;
     
-    const [, board, taskIndex] = findBoardForTask(id as string);
+    const taskType = (id as string).startsWith('goal') ? 'goal' : 'task';
+    const [sourceBoards] = getBoardSetters(taskType);
+    
+    const [board, taskIndex] = findBoardForTask(id as string, sourceBoards);
     if(board && taskIndex > -1) {
       setActiveTask(board.tasks[taskIndex]);
     }
@@ -138,67 +163,54 @@ export default function Home() {
     if (activeId === overId) return;
 
     const activeTaskType = activeId.startsWith('goal') ? 'goal' : 'task';
-    const overTaskType = over.data.current?.type === 'Task' ? (overId.startsWith('goal') ? 'goal' : 'task') : over.data.current?.boardType;
-
-    if (!overTaskType || activeTaskType !== overTaskType) {
+    const overData = over.data.current;
+    
+    // Determina o tipo do 'over' item (seja uma coluna ou outra tarefa)
+    const overType = overData?.type === 'Board' ? overData.boardType : (overData?.type === 'Task' ? (overId.startsWith('goal') ? 'goal' : 'task') : undefined);
+    
+    if (!overType || activeTaskType !== overType) {
         return;
     }
-
-    const [currentBoards, setBoardsState] = getBoardSetters(activeTaskType);
+    
+    const [, setBoardsState] = getBoardSetters(activeTaskType);
   
-    const isActiveATask = active.data.current?.type === 'Task';
-    const isOverAColumn = over.data.current?.type === 'Board';
+    setBoardsState(currentBoards => {
+      const [sourceBoard, sourceTaskIndex] = findBoardForTask(activeId, currentBoards);
+      if (!sourceBoard) return currentBoards;
 
-    // Dragging a task over a column
-    if (isActiveATask && isOverAColumn) {
-        const [, activeBoard] = findBoardForTask(activeId);
-        const overBoard = currentBoards.find(b => b.id === overId);
+      let newBoards = [...currentBoards];
 
-        if (activeBoard && overBoard && activeBoard.id !== overBoard.id) {
-            setBoardsState(boards => {
-                const newBoards = [...boards];
-                const sourceBoard = newBoards.find(b => b.id === activeBoard.id);
-                const destinationBoard = newBoards.find(b => b.id === overBoard.id);
-                if(!sourceBoard || !destinationBoard) return boards;
-
-                const taskIndex = sourceBoard.tasks.findIndex(t => t.id === activeId);
-                if(taskIndex > -1) {
-                    const [movedTask] = sourceBoard.tasks.splice(taskIndex, 1);
-                    destinationBoard.tasks.push(movedTask);
-                }
-                return newBoards;
-            });
+      // Cenário 1: Arrastando uma tarefa sobre uma coluna diferente
+      if (overData?.type === 'Board' && over.id !== sourceBoard.id) {
+        const destinationBoard = newBoards.find(b => b.id === over.id);
+        if (destinationBoard && sourceTaskIndex > -1) {
+          const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
+          destinationBoard.tasks.push(movedTask);
+          return newBoards;
         }
-    }
-  
-    const isOverATask = over.data.current?.type === 'Task';
-  
-    // Dragging a task over another task
-    if (isActiveATask && isOverATask) {
-        const [, activeBoard] = findBoardForTask(activeId);
-        const [, overBoard] = findBoardForTask(overId);
+      }
 
-        if(activeBoard && overBoard) {
-            setBoardsState(boards => {
-                const newBoards = [...boards];
-                const sourceBoard = newBoards.find(b => b.id === activeBoard.id);
-                const destinationBoard = newBoards.find(b => b.id === overBoard.id);
-                if(!sourceBoard || !destinationBoard) return boards;
+      // Cenário 2: Arrastando uma tarefa sobre outra tarefa
+      if (overData?.type === 'Task') {
+        const [destinationBoard, destinationTaskIndex] = findBoardForTask(overId, newBoards);
 
-                const activeIndex = sourceBoard.tasks.findIndex(t => t.id === activeId);
-                const overIndex = destinationBoard.tasks.findIndex(t => t.id === overId);
-                
-                if (sourceBoard.id === destinationBoard.id) {
-                    sourceBoard.tasks = arrayMove(sourceBoard.tasks, activeIndex, overIndex);
-                } else {
-                    const [movedTask] = sourceBoard.tasks.splice(activeIndex, 1);
-                    destinationBoard.tasks.splice(overIndex, 0, movedTask);
-                }
-        
-                return newBoards;
-            });
+        if (!destinationBoard || sourceTaskIndex === -1 || destinationTaskIndex === -1) {
+          return currentBoards;
         }
-    }
+
+        if (sourceBoard.id === destinationBoard.id) {
+          // Reordenar dentro do mesmo quadro
+          destinationBoard.tasks = arrayMove(destinationBoard.tasks, sourceTaskIndex, destinationTaskIndex);
+        } else {
+          // Mover para um quadro diferente
+          const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
+          destinationBoard.tasks.splice(destinationTaskIndex, 0, movedTask);
+        }
+        return newBoards;
+      }
+
+      return currentBoards;
+    });
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -206,7 +218,7 @@ export default function Home() {
   };
 
   if (!isClient) {
-    return null; // or a loading skeleton
+    return null; // ou um esqueleto de carregamento
   }
 
   return (
