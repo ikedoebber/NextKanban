@@ -15,12 +15,13 @@ import {z} from 'genkit';
 
 const SuggestBoardPlacementInputSchema = z.object({
   taskDescription: z.string().describe('A descrição da tarefa.'),
+  boardNames: z.array(z.string()).describe('A lista de quadros disponíveis para colocar a tarefa.'),
 });
 export type SuggestBoardPlacementInput = z.infer<typeof SuggestBoardPlacementInputSchema>;
 
 const SuggestBoardPlacementOutputSchema = z.object({
   suggestedBoard: z
-    .enum(['A Fazer', 'Fazendo', 'Feito', 'Não Iniciado'])
+    .string()
     .describe('O quadro sugerido para a tarefa.'),
   reasoning: z.string().describe('A justificativa para a sugestão de quadro.'),
 });
@@ -38,7 +39,7 @@ const prompt = ai.definePrompt({
   output: {schema: SuggestBoardPlacementOutputSchema},
   prompt: `Você é um assistente de IA que ajuda os usuários a organizar suas tarefas em um quadro Kanban.
 
-O quadro Kanban tem quatro colunas: A Fazer, Fazendo, Feito e Não Iniciado.
+Os quadros Kanban disponíveis são: {{#each boardNames}}'{{this}}'{{#if @last}}{{else}}, {{/if}}{{/each}}.
 
 Dada a seguinte descrição da tarefa, sugira em qual quadro a tarefa deve ser colocada e explique seu raciocínio.
 
