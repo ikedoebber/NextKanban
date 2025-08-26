@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BrainCircuit } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { BrainCircuit, LogOut } from 'lucide-react';
 
 import type { Board, Task, BoardName, CalendarEvent } from '@/types';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
@@ -10,6 +11,7 @@ import { AiSuggester } from '@/components/kanban/ai-suggester';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { GoogleCalendarView } from '@/components/calendar/google-calendar-view';
+import { Button } from '@/components/ui/button';
 
 const initialBoards: Board[] = [
   { id: 'Não Iniciado', title: 'Não Iniciado', tasks: [
@@ -51,16 +53,24 @@ const initialCalendarEvents: CalendarEvent[] = [
   { id: 'evt5', title: 'Demonstração do produto', time: '15:00 - 16:00', date: 'Sexta-feira' },
 ];
 
-export default function Home() {
+export default function KanbanPage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [goalsBoards, setGoalsBoards] = useState<Board[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
+    // Simulação: Em um aplicativo real, você verificaria um token de autenticação
+    const isLoggedIn = localStorage.getItem('isLoggedIn');
+    if (isLoggedIn !== 'true') {
+      router.push('/welcome');
+      return;
+    }
+
     // Em um aplicativo real, você buscaria isso de um armazenamento persistente
     const savedBoards = localStorage.getItem('kanbanBoards');
     const savedGoalsBoards = localStorage.getItem('goalsBoards');
@@ -81,7 +91,7 @@ export default function Home() {
     } else {
       setCalendarEvents(initialCalendarEvents);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (isClient) {
@@ -287,6 +297,11 @@ export default function Home() {
   const handleDeleteEvent = (eventId: string) => {
     setCalendarEvents(prev => prev.filter(event => event.id !== eventId));
   };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('isLoggedIn');
+    router.push('/welcome');
+  };
 
 
   if (!isClient) {
@@ -298,7 +313,12 @@ export default function Home() {
       <div className="flex flex-col h-full w-full">
         <header className="p-4 border-b flex justify-between items-center bg-card/50 backdrop-blur-sm">
           <h1 className="text-2xl font-bold font-headline text-primary-foreground/90">DfD Kanban</h1>
-          <AiSuggester onSuggested={handleAddTask} />
+          <div className="flex items-center gap-4">
+            <AiSuggester onSuggested={handleAddTask} />
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </header>
         <main className="flex-1 overflow-x-auto overflow-y-auto p-6 space-y-8">
           <div>
@@ -338,7 +358,3 @@ export default function Home() {
     </DndContext>
   );
 }
-
-    
-
-    
