@@ -4,11 +4,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { auth } from '@/lib/firebase';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,9 +19,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Lógica de cadastro simulada
     if (password !== confirmPassword) {
       toast({
         variant: 'destructive',
@@ -28,18 +29,26 @@ export default function SignupPage() {
       });
       return;
     }
-    if (email && password) {
-      localStorage.setItem('isLoggedIn', 'true');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
       toast({
         title: 'Cadastro bem-sucedido!',
-        description: 'Sua conta foi criada.',
+        description: 'Sua conta foi criada. Você já pode fazer o login.',
       });
       router.push('/');
-    } else {
-       toast({
+    } catch (error: any) {
+      let description = 'Ocorreu um erro desconhecido.';
+      if (error.code === 'auth/email-already-in-use') {
+        description = 'Este email já está em uso.';
+      } else if (error.code === 'auth/invalid-email') {
+        description = 'O formato do email é inválido.';
+      } else if (error.code === 'auth/weak-password') {
+        description = 'A senha é muito fraca. Ela deve ter pelo menos 6 caracteres.';
+      }
+      toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: 'Por favor, preencha todos os campos.',
+        title: 'Erro no Cadastro',
+        description,
       });
     }
   };

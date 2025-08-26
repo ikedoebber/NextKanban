@@ -4,6 +4,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { BrainCircuit, LogOut } from 'lucide-react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, getDocs, doc, writeBatch, addDoc, updateDoc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
+
 
 import type { Board, Task, BoardName, CalendarEvent } from '@/types';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
@@ -12,104 +15,94 @@ import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor,
 import { arrayMove } from '@dnd-kit/sortable';
 import { GoogleCalendarView } from '@/components/calendar/google-calendar-view';
 import { Button } from '@/components/ui/button';
+import { auth, db } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 const initialBoards: Board[] = [
-  { id: 'Não Iniciado', title: 'Não Iniciado', tasks: [
-    { id: 'task-1', content: 'Projetar a interface do usuário principal' },
-    { id: 'task-2', content: 'Configurar a estrutura do projeto' },
-  ]},
-  { id: 'A Fazer', title: 'A Fazer', tasks: [
-    { id: 'task-3', content: 'Desenvolver o componente do quadro Kanban' },
-    { id: 'task-4', content: 'Implementar a funcionalidade de arrastar e soltar' },
-  ] },
-  { id: 'Fazendo', title: 'Fazendo', tasks: [
-    { id: 'task-5', content: 'Integrar o recurso de sugestão de tarefas de IA' },
-  ] },
-  { id: 'Feito', title: 'Feito', tasks: [
-    { id: 'task-6', content: 'Implantar a aplicação' },
-  ] },
+  { id: 'Não Iniciado', title: 'Não Iniciado', tasks: []},
+  { id: 'A Fazer', title: 'A Fazer', tasks: [] },
+  { id: 'Fazendo', title: 'Fazendo', tasks: [] },
+  { id: 'Feito', title: 'Feito', tasks: [] },
 ];
 
 const initialGoalsBoards: Board[] = [
-  { id: 'Semanal', title: 'Semanal', tasks: [
-      { id: 'goal-1', content: 'Correr 5km' },
-  ]},
-  { id: 'Mensal', title: 'Mensal', tasks: [
-      { id: 'goal-2', content: 'Ler 2 livros' },
-  ] },
-  { id: 'Trimestral', title: 'Trimestral', tasks: [
-      { id: 'goal-3', content: 'Aprender uma nova habilidade' },
-  ] },
-  { id: 'Anual', title: 'Anual', tasks: [
-      { id: 'goal-4', content: 'Viajar para um novo país' },
-  ] },
-];
-
-const initialCalendarEvents: CalendarEvent[] = [
-  { id: 'evt1', title: 'Reunião de planejamento de sprint', time: '10:00 - 11:00', date: 'Segunda-feira' },
-  { id: 'evt2', title: 'Entrevista com candidato', time: '14:00 - 15:00', date: 'Terça-feira' },
-  { id: 'evt3', title: 'Revisão de design com a equipe', time: '11:00 - 12:30', date: 'Quarta-feira' },
-  { id: 'evt4', title: 'Foco no desenvolvimento', time: '09:00 - 17:00', date: 'Quinta-feira' },
-  { id: 'evt5', title: 'Demonstração do produto', time: '15:00 - 16:00', date: 'Sexta-feira' },
+  { id: 'Semanal', title: 'Semanal', tasks: []},
+  { id: 'Mensal', title: 'Mensal', tasks: [] },
+  { id: 'Trimestral', title: 'Trimestral', tasks: [] },
+  { id: 'Anual', title: 'Anual', tasks: [] },
 ];
 
 export default function KanbanPage() {
-  const [boards, setBoards] = useState<Board[]>([]);
-  const [goalsBoards, setGoalsBoards] = useState<Board[]>([]);
+  const [boards, setBoards] = useState<Board[]>(initialBoards);
+  const [goalsBoards, setGoalsBoards] = useState<Board[]>(initialGoalsBoards);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [user, setUser] = useState<User | null>(null);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
-    // Simulação: Em um aplicativo real, você verificaria um token de autenticação
-    const isLoggedIn = localStorage.getItem('isLoggedIn');
-    if (isLoggedIn !== 'true') {
-      router.push('/welcome');
-      return;
-    }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+      } else {
+        router.push('/welcome');
+      }
+    });
 
-    // Em um aplicativo real, você buscaria isso de um armazenamento persistente
-    const savedBoards = localStorage.getItem('kanbanBoards');
-    const savedGoalsBoards = localStorage.getItem('goalsBoards');
-    const savedCalendarEvents = localStorage.getItem('calendarEvents');
-
-    if (savedBoards) {
-      setBoards(JSON.parse(savedBoards));
-    } else {
-      setBoards(initialBoards);
-    }
-    if (savedGoalsBoards) {
-      setGoalsBoards(JSON.parse(savedGoalsBoards));
-    } else {
-      setGoalsBoards(initialGoalsBoards);
-    }
-    if (savedCalendarEvents) {
-      setCalendarEvents(JSON.parse(savedCalendarEvents));
-    } else {
-      setCalendarEvents(initialCalendarEvents);
-    }
+    return () => unsubscribe();
   }, [router]);
 
   useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('kanbanBoards', JSON.stringify(boards));
+    if (user) {
+      fetchData('tasks', setBoards);
+      fetchData('goals', setGoalsBoards);
+      fetchCalendarEvents();
     }
-  }, [boards, isClient]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('goalsBoards', JSON.stringify(goalsBoards));
+  const fetchData = async (collectionName: string, setState: React.Dispatch<React.SetStateAction<Board[]>>) => {
+    if (!user) return;
+    try {
+      const q = query(collection(db, 'users', user.uid, collectionName), orderBy('order'));
+      const querySnapshot = await getDocs(q);
+      
+      const boardsData: { [key: string]: Board } = {};
+      (collectionName === 'tasks' ? initialBoards : initialGoalsBoards).forEach(b => {
+        boardsData[b.id] = { ...b, tasks: [] };
+      });
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const task = { id: doc.id, ...data } as Task;
+        const boardId = data.boardId as BoardName;
+        if (boardsData[boardId]) {
+          boardsData[boardId].tasks.push(task);
+        }
+      });
+      setState(Object.values(boardsData));
+    } catch (error) {
+      console.error("Error fetching data: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao buscar dados.'});
     }
-  }, [goalsBoards, isClient]);
+  };
 
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem('calendarEvents', JSON.stringify(calendarEvents));
+  const fetchCalendarEvents = async () => {
+    if (!user) return;
+    try {
+      const q = query(collection(db, 'users', user.uid, 'calendarEvents'), orderBy('startTime'));
+      const querySnapshot = await getDocs(q);
+      const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent));
+      setCalendarEvents(events);
+    } catch (error) {
+      console.error("Error fetching calendar events: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao buscar compromissos.'});
     }
-  }, [calendarEvents, isClient]);
+  };
 
 
   const sensors = useSensors(
@@ -120,79 +113,125 @@ export default function KanbanPage() {
     })
   );
 
-  const getBoardSetters = (type?: string): [Board[], React.Dispatch<React.SetStateAction<Board[]>>] => {
-    return type === 'goal' ? [goalsBoards, setGoalsBoards] : [boards, setBoards];
+  const getBoardInfo = (type?: string): [Board[], React.Dispatch<React.SetStateAction<Board[]>>, string, Board[]] => {
+    return type === 'goal' ? [goalsBoards, setGoalsBoards, 'goals', initialGoalsBoards] : [boards, setBoards, 'tasks', initialBoards];
   }
 
-  const handleAddTask = (boardId: BoardName, content: string) => {
-    if (!content) return;
+  const handleAddTask = async (boardId: BoardName, content: string) => {
+    if (!content.trim() || !user) return;
+    
     const isGoal = initialGoalsBoards.some(b => b.id === boardId);
-    const [, setBoardsState] = getBoardSetters(isGoal ? 'goal' : 'task');
-    const newTask: Task = {
-      id: `${isGoal ? 'goal' : 'task'}-${Date.now()}`,
+    const [currentBoards, , collectionName] = getBoardInfo(isGoal ? 'goal' : 'task');
+    const board = currentBoards.find(b => b.id === boardId);
+    if (!board) return;
+
+    const newTaskData = {
       content,
+      boardId,
+      order: board.tasks.length,
+      createdAt: new Date().toISOString(),
     };
-    setBoardsState(currentBoards =>
-      currentBoards.map(board =>
-        board.id === boardId
-          ? { ...board, tasks: [...board.tasks, newTask] }
-          : board
-      )
-    );
+
+    try {
+      const docRef = await addDoc(collection(db, 'users', user.uid, collectionName), newTaskData);
+      const newTask: Task = { id: docRef.id, ...newTaskData };
+      
+      const setBoardsState = isGoal ? setGoalsBoards : setBoards;
+      setBoardsState(prev =>
+        prev.map(b =>
+          b.id === boardId
+            ? { ...b, tasks: [...b.tasks, newTask] }
+            : b
+        )
+      );
+    } catch (error) {
+       console.error("Error adding document: ", error);
+       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar tarefa.'});
+    }
   };
 
-  const handleEditTask = (taskId: string, newContent: string) => {
-    const [, setBoardsState] = getBoardSetters(taskId.startsWith('goal') ? 'goal' : 'task');
-    setBoardsState(boards =>
-      boards.map(board => ({
-        ...board,
-        tasks: board.tasks.map(task =>
-          task.id === taskId ? { ...task, content: newContent } : task
-        ),
-      }))
-    );
+  const handleEditTask = async (taskId: string, newContent: string) => {
+    if (!user) return;
+    const taskType = taskId.includes('goal') ? 'goal' : 'task';
+    const [, setBoardsState, collectionName] = getBoardInfo(taskType);
+    
+    const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
+    try {
+      await updateDoc(taskRef, { content: newContent });
+      setBoardsState(boards =>
+        boards.map(board => ({
+          ...board,
+          tasks: board.tasks.map(task =>
+            task.id === taskId ? { ...task, content: newContent } : task
+          ),
+        }))
+      );
+    } catch (error) {
+      console.error("Error updating document: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar tarefa.'});
+    }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    const [, setBoardsState] = getBoardSetters(taskId.startsWith('goal') ? 'goal' : 'task');
-    setBoardsState(boards =>
-      boards.map(board => ({
-        ...board,
-        tasks: board.tasks.filter(task => task.id !== taskId),
-      }))
-    );
+  const handleDeleteTask = async (taskId: string) => {
+    if (!user) return;
+    const taskType = taskId.includes('goal') ? 'goal' : 'task';
+    const [, setBoardsState, collectionName] = getBoardInfo(taskType);
+
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, collectionName, taskId));
+      setBoardsState(boards =>
+        boards.map(board => ({
+          ...board,
+          tasks: board.tasks.filter(task => task.id !== taskId),
+        }))
+      );
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir tarefa.'});
+    }
   };
   
-  const handleMoveTaskToNextBoard = (taskId: string) => {
+  const handleMoveTaskToNextBoard = async (taskId: string) => {
     const taskType = taskId.startsWith('goal') ? 'goal' : 'task';
-    const [currentBoards, setBoardsState] = getBoardSetters(taskType);
+    const [currentBoards, setBoardsState, collectionName, initialBoardConfig] = getBoardInfo(taskType);
 
     let sourceBoardIndex = -1;
     let sourceTaskIndex = -1;
+    let taskToMove: Task | null = null;
 
     for (let i = 0; i < currentBoards.length; i++) {
         const taskIndex = currentBoards[i].tasks.findIndex(t => t.id === taskId);
         if (taskIndex !== -1) {
             sourceBoardIndex = i;
             sourceTaskIndex = taskIndex;
+            taskToMove = currentBoards[i].tasks[taskIndex];
             break;
         }
     }
 
-    if (sourceBoardIndex === -1 || sourceBoardIndex === currentBoards.length - 1) {
+    if (!taskToMove || sourceBoardIndex === -1 || sourceBoardIndex === currentBoards.length - 1) {
         return; 
     }
 
-    const destinationBoardIndex = sourceBoardIndex + 1;
+    const destinationBoard = currentBoards[sourceBoardIndex + 1];
+    if(!user) return;
 
-    setBoardsState(prevBoards => {
-        const newBoards = [...prevBoards.map(b => ({...b, tasks: [...b.tasks]}))];
-        const sourceBoard = newBoards[sourceBoardIndex];
-        const destinationBoard = newBoards[destinationBoardIndex];
-        const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
-        destinationBoard.tasks.push(movedTask);
-        return newBoards;
-    });
+    try {
+      const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
+      await updateDoc(taskRef, { boardId: destinationBoard.id });
+
+      setBoardsState(prevBoards => {
+          const newBoards = [...prevBoards.map(b => ({...b, tasks: [...b.tasks]}))];
+          const sourceBoard = newBoards[sourceBoardIndex];
+          const destBoard = newBoards[sourceBoardIndex + 1];
+          const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
+          destBoard.tasks.push(movedTask);
+          return newBoards;
+      });
+    } catch(e) {
+      console.error("Error moving task: ", e);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao mover tarefa.'});
+    }
   };
 
   const findBoardForTask = (taskId: string, boardsToSearch: Board[]): [Board | undefined, number] => {
@@ -210,7 +249,7 @@ export default function KanbanPage() {
     const { id } = active;
     
     const taskType = (id as string).startsWith('goal') ? 'goal' : 'task';
-    const [sourceBoards] = getBoardSetters(taskType);
+    const [sourceBoards] = getBoardInfo(taskType);
     
     const [board, taskIndex] = findBoardForTask(id as string, sourceBoards);
     if(board && taskIndex > -1) {
@@ -220,7 +259,7 @@ export default function KanbanPage() {
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over || !active) return;
   
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -236,7 +275,7 @@ export default function KanbanPage() {
         return;
     }
     
-    const [, setBoardsState] = getBoardSetters(activeTaskType);
+    const [, setBoardsState] = getBoardInfo(activeTaskType);
   
     setBoardsState(currentBoards => {
       const [sourceBoard, sourceTaskIndex] = findBoardForTask(activeId, currentBoards);
@@ -246,65 +285,120 @@ export default function KanbanPage() {
       let sourceBoardInNew = newBoards.find((b: Board) => b.id === sourceBoard.id);
       if (!sourceBoardInNew) return currentBoards;
 
-      const activeTask = sourceBoardInNew.tasks.splice(sourceTaskIndex, 1)[0];
+      const [activeTask] = sourceBoardInNew.tasks.splice(sourceTaskIndex, 1);
   
       if (overData?.type === 'Board') {
         const destinationBoard = newBoards.find((b: Board) => b.id === over.id);
         if(destinationBoard) {
-            destinationBoard.tasks.push(activeTask);
+          destinationBoard.tasks.push(activeTask);
         }
       } else if (overData?.type === 'Task') {
         const [overBoard] = findBoardForTask(overId, newBoards);
         const destinationBoard = newBoards.find((b: Board) => b.id === overBoard?.id);
         
-        if (!destinationBoard) {
-          return currentBoards;
-        }
-
+        if (!destinationBoard) return currentBoards;
         const overTaskIndex = destinationBoard.tasks.findIndex(t => t.id === overId);
-
-        if (sourceBoard.id === destinationBoard.id) {
-            destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
-            
-        } else {
-            destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
-        }
+        destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
       }
       return newBoards;
     });
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     setActiveTask(null);
+    const { active, over } = event;
+    if (!over || !user) return;
+
+    const activeId = active.id as string;
+    const taskType = activeId.startsWith('goal') ? 'goal' : 'task';
+    const [currentBoards, , collectionName] = getBoardInfo(taskType);
+    
+    const [sourceBoardBeforeDrag] = findBoardForTask(activeId, taskType === 'goal' ? initialGoalsBoards : initialBoards);
+    const [destBoardAfterDrag, destTaskIndex] = findBoardForTask(activeId, currentBoards);
+
+    if (!destBoardAfterDrag) return;
+
+    const batch = writeBatch(db);
+
+    // Update the moved task's boardId
+    const taskRef = doc(db, 'users', user.uid, collectionName, activeId);
+    batch.update(taskRef, { boardId: destBoardAfterDrag.id });
+
+    // Update the order of all tasks in the destination board
+    destBoardAfterDrag.tasks.forEach((task, index) => {
+      const tRef = doc(db, 'users', user.uid, collectionName, task.id);
+      batch.update(tRef, { order: index });
+    });
+    
+    // If the task moved from a different board, update the source board's task orders too
+    if (sourceBoardBeforeDrag && sourceBoardBeforeDrag.id !== destBoardAfterDrag.id) {
+       sourceBoardBeforeDrag.tasks.forEach((task, index) => {
+          if (task.id !== activeId) {
+            const tRef = doc(db, 'users', user.uid, collectionName, task.id);
+            batch.update(tRef, { order: index });
+          }
+       });
+    }
+
+    try {
+      await batch.commit();
+      // Refetch data to ensure consistency
+      fetchData(collectionName, taskType === 'goal' ? setGoalsBoards : setBoards);
+    } catch (error) {
+       console.error("Error updating tasks order: ", error);
+       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a ordem das tarefas.'});
+    }
   };
   
-  const handleAddEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
-    const newEvent: CalendarEvent = {
-      id: `evt-${Date.now()}`,
-      ...eventData
+  const handleAddEvent = async (eventData: Omit<CalendarEvent, 'id'>) => {
+    if (!user) return;
+    const newEventData = {
+      ...eventData,
+      createdAt: new Date().toISOString()
     };
-    setCalendarEvents(prev => [...prev, newEvent]);
+    try {
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'calendarEvents'), newEventData);
+      const newEvent: CalendarEvent = { id: docRef.id, ...newEventData };
+      setCalendarEvents(prev => [...prev, newEvent].sort((a,b) => a.time.localeCompare(b.time)));
+    } catch (error) {
+      console.error("Error adding event: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar compromisso.'});
+    }
   };
 
-  const handleEditEvent = (eventId: string, updatedData: Partial<Omit<CalendarEvent, 'id'>>) => {
-    setCalendarEvents(prev =>
-      prev.map(event =>
-        event.id === eventId ? { ...event, ...updatedData } : event
-      )
-    );
+  const handleEditEvent = async (eventId: string, updatedData: Partial<Omit<CalendarEvent, 'id'>>) => {
+     if (!user) return;
+     try {
+       await updateDoc(doc(db, 'users', user.uid, 'calendarEvents', eventId), updatedData);
+       setCalendarEvents(prev =>
+        prev.map(event =>
+          event.id === eventId ? { ...event, ...updatedData } : event
+        ).sort((a,b) => a.time.localeCompare(b.time))
+      );
+     } catch (error) {
+       console.error("Error updating event: ", error);
+       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar compromisso.'});
+     }
   };
 
-  const handleDeleteEvent = (eventId: string) => {
-    setCalendarEvents(prev => prev.filter(event => event.id !== eventId));
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'calendarEvents', eventId));
+      setCalendarEvents(prev => prev.filter(event => event.id !== eventId));
+    } catch (error) {
+      console.error("Error deleting event: ", error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir compromisso.'});
+    }
   };
   
   const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
+    auth.signOut();
     router.push('/welcome');
   };
 
 
-  if (!isClient) {
+  if (!isClient || !user) {
     return null; // ou um esqueleto de carregamento
   }
 
