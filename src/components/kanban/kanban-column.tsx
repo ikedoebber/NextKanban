@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, GripVertical } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext as SortableListContext } from '@dnd-kit/sortable';
 
@@ -23,6 +23,39 @@ interface KanbanColumnProps {
   onMoveTask: (taskId: string) => void;
   activeTask: Task | null;
   type: 'task' | 'goal';
+}
+
+function ExampleCard() {
+  const examples = {
+    'Não Iniciado': 'Brainstorm de novas funcionalidades...',
+    'A Fazer': 'Desenvolver a página de perfil do usuário...',
+    'Fazendo': 'Implementar a lógica de autenticação...',
+    'Feito': 'Configurar o deploy inicial do projeto.',
+    'Semanal': 'Revisar o progresso das metas da semana.',
+    'Mensal': 'Planejar o orçamento do próximo mês.',
+    'Trimestral': 'Definir OKRs para o próximo trimestre.',
+    'Anual': 'Finalizar o relatório anual de desempenho.',
+  };
+
+  const boardTitle = useMemo(() => {
+    const titles = Object.keys(examples) as (keyof typeof examples)[];
+    return titles[Math.floor(Math.random() * titles.length)];
+  }, []);
+
+  return (
+    <Card className="group relative bg-card/50 shadow-none border-dashed">
+       <CardContent className="p-3 flex items-start gap-2">
+         <div className="p-1 -ml-1 text-muted-foreground/50">
+           <GripVertical className="h-5 w-5" />
+         </div>
+         <div className="flex-1 pt-0.5">
+          <p className="text-sm min-h-[2rem] flex items-center text-muted-foreground/80">
+            {examples[boardTitle as keyof typeof examples] || "Exemplo de tarefa..."}
+          </p>
+         </div>
+       </CardContent>
+     </Card>
+  )
 }
 
 export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMoveTask, activeTask, type }: KanbanColumnProps) {
@@ -85,7 +118,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMov
                     />
                   ))
                 ) : (
-                  <div className="text-center text-sm text-muted-foreground py-4">Nenhuma tarefa ainda.</div>
+                  <ExampleCard />
                 )}
               </SortableListContext>
             </div>
