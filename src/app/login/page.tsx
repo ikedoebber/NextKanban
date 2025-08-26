@@ -29,10 +29,21 @@ export default function LoginPage() {
       router.push('/');
     } catch (error: any) {
       let description = 'Ocorreu um erro desconhecido.';
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        description = 'Email ou senha inválidos.';
-      } else if (error.code === 'auth/invalid-email') {
-        description = 'O formato do email é inválido.';
+      switch (error.code) {
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          description = 'Email ou senha inválidos.';
+          break;
+        case 'auth/invalid-email':
+          description = 'O formato do email é inválido.';
+          break;
+        case 'auth/too-many-requests':
+          description = 'Muitas tentativas de login. Tente novamente mais tarde.';
+          break;
+        case 'auth/network-request-failed':
+          description = 'Erro de rede. Verifique sua conexão com a internet.';
+          break;
       }
       toast({
         variant: 'destructive',

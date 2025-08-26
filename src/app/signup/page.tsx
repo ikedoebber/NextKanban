@@ -38,12 +38,19 @@ export default function SignupPage() {
       router.push('/');
     } catch (error: any) {
       let description = 'Ocorreu um erro desconhecido.';
-      if (error.code === 'auth/email-already-in-use') {
-        description = 'Este email já está em uso.';
-      } else if (error.code === 'auth/invalid-email') {
-        description = 'O formato do email é inválido.';
-      } else if (error.code === 'auth/weak-password') {
-        description = 'A senha é muito fraca. Ela deve ter pelo menos 6 caracteres.';
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          description = 'Este email já está em uso.';
+          break;
+        case 'auth/invalid-email':
+          description = 'O formato do email é inválido.';
+          break;
+        case 'auth/weak-password':
+          description = 'A senha é muito fraca. Ela deve ter pelo menos 6 caracteres.';
+          break;
+        case 'auth/network-request-failed':
+          description = 'Erro de rede. Verifique sua conexão com a internet.';
+          break;
       }
       toast({
         variant: 'destructive',
