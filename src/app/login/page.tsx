@@ -28,7 +28,7 @@ export default function LoginPage() {
       });
       router.push('/');
     } catch (error: any) {
-      let description = 'Ocorreu um erro desconhecido.';
+      let description = `Ocorreu um erro desconhecido. Código: ${error.code}`;
       switch (error.code) {
         case 'auth/user-not-found':
         case 'auth/wrong-password':

@@ -37,7 +37,7 @@ export default function SignupPage() {
       });
       router.push('/');
     } catch (error: any) {
-      let description = 'Ocorreu um erro desconhecido.';
+      let description = `Ocorreu um erro desconhecido. Código: ${error.code}`;
       switch (error.code) {
         case 'auth/email-already-in-use':
           description = 'Este email já está em uso.';
@@ -50,6 +50,9 @@ export default function SignupPage() {
           break;
         case 'auth/network-request-failed':
           description = 'Erro de rede. Verifique sua conexão com a internet.';
+          break;
+        case 'auth/invalid-credential':
+          description = 'Credenciais inválidas. Verifique seu email e senha.';
           break;
       }
       toast({
