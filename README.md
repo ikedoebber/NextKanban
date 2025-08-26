@@ -1,6 +1,6 @@
-# NextKanban - Seu Quadro Kanban com Tecnologia de IA
+# DfDKanban - Seu Quadro Kanban com Tecnologia de IA
 
-Bem-vindo ao NextKanban! Esta é uma aplicação web completa construída para ajudá-lo a organizar suas tarefas, gerenciar suas metas e planejar sua semana de forma eficiente, tudo em um só lugar e com o poder da inteligência artificial.
+Bem-vindo ao DfDKanban! Esta é uma aplicação web completa construída para ajudá-lo a organizar suas tarefas, gerenciar suas metas e planejar sua semana de forma eficiente, tudo em um só lugar e com o poder da inteligência artificial.
 
 ## ✨ Funcionalidades Principais
 
