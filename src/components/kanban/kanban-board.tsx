@@ -3,7 +3,6 @@
 
 import type { Board, BoardName, Task, ItemType } from '@/types';
 import { KanbanColumn } from './kanban-column';
-import { SortableContext } from '@dnd-kit/sortable';
 import { useMemo } from 'react';
 
 interface KanbanBoardProps {
@@ -20,23 +19,19 @@ export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, onMov
   const boardsId = useMemo(() => boards.map((board) => board.id), [boards]);
 
   return (
-    <div className="flex gap-6 items-start">
-      <SortableContext items={boardsId}>
-        {boards.map(board => (
-          <KanbanColumn
-            key={board.id}
-            board={board}
-            onAddTask={onAddTask}
-            onEditTask={onEditTask}
-            onDeleteTask={onDeleteTask}
-            onMoveTask={onMoveTask}
-            activeTask={activeTask}
-            type={type}
-          />
-        ))}
-      </SortableContext>
-    </div>
+    <>
+      {boards.map(board => (
+        <KanbanColumn
+          key={board.id}
+          board={board}
+          onAddTask={onAddTask}
+          onEditTask={onEditTask}
+          onDeleteTask={onDeleteTask}
+          onMoveTask={onMoveTask}
+          activeTask={activeTask}
+          type={type}
+        />
+      ))}
+    </>
   );
 }
-
-    
