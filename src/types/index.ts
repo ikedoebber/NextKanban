@@ -17,8 +17,12 @@ export interface Board {
 export interface CalendarEvent {
   id: string;
   title: string;
-  time: string;
+  startTime: string;
+  endTime: string;
   date: string;
-  startTime?: string;
-  endTime?: string;
+  createdAt?: string;
 }
+
+export type ItemType = 'task' | 'goal';
+
+    

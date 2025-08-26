@@ -6,7 +6,7 @@ import { Plus, GripVertical } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext as SortableListContext } from '@dnd-kit/sortable';
 
-import type { Board, BoardName, Task } from '@/types';
+import type { Board, BoardName, Task, ItemType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -17,12 +17,12 @@ import { useMemo } from 'react';
 
 interface KanbanColumnProps {
   board: Board;
-  onAddTask: (boardId: BoardName, content: string) => void;
-  onEditTask: (taskId: string, newContent: string) => void;
-  onDeleteTask: (taskId: string) => void;
-  onMoveTask: (taskId: string) => void;
+  onAddTask: (boardId: BoardName, content: string, type: ItemType) => void;
+  onEditTask: (taskId: string, newContent: string, type: ItemType) => void;
+  onDeleteTask: (taskId: string, type: ItemType) => void;
+  onMoveTask: (taskId: string, type: ItemType) => void;
   activeTask: Task | null;
-  type: 'task' | 'goal';
+  type: ItemType;
 }
 
 function ExampleCard() {
@@ -80,7 +80,7 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMov
   }, [board.id, type]);
 
   const handleAddTask = (content: string) => {
-    onAddTask(board.id, content);
+    onAddTask(board.id, content, type);
     setIsAddDialogOpen(false);
   };
 
@@ -134,3 +134,5 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMov
     </>
   );
 }
+
+    

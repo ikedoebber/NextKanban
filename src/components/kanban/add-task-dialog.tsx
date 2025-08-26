@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -28,6 +29,7 @@ export function AddTaskDialog({ isOpen, onOpenChange, onAddTask, boardName }: Ad
     if (content.trim()) {
       onAddTask(content.trim());
       setContent('');
+      onOpenChange(false);
     }
   };
 
@@ -62,3 +64,5 @@ export function AddTaskDialog({ isOpen, onOpenChange, onAddTask, boardName }: Ad
     </Dialog>
   );
 }
+
+    

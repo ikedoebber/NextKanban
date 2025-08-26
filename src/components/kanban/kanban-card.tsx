@@ -6,7 +6,7 @@ import { Trash2, GripVertical } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import type { BoardName, Task } from '@/types';
+import type { BoardName, Task, ItemType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,12 +28,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface KanbanCardProps {
   task: Task;
   boardId: BoardName;
-  onEdit: (taskId: string, newContent: string) => void;
-  onDelete: (taskId: string) => void;
-  onMove: (taskId: string) => void;
+  onEdit: (taskId: string, newContent: string, type: ItemType) => void;
+  onDelete: (taskId: string, type: ItemType) => void;
+  onMove: (taskId: string, type: ItemType) => void;
   isLastColumn: boolean;
   isDragging: boolean;
-  type: 'task' | 'goal';
+  type: ItemType;
 }
 
 export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColumn, isDragging, type }: KanbanCardProps) {
@@ -52,6 +52,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
     id: task.id,
     data: {
       type: 'Task',
+      taskType: type, // Pass the type here
       boardId,
     },
   });
@@ -69,7 +70,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
   
   const handleSave = () => {
     if (content.trim() && content.trim() !== task.content) {
-      onEdit(task.id, content.trim());
+      onEdit(task.id, content.trim(), type);
     } else {
       setContent(task.content);
     }
@@ -130,7 +131,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Checkbox id={`check-${task.id}`} onCheckedChange={() => onMove(task.id)} />
+                  <Checkbox id={`check-${task.id}`} onCheckedChange={() => onMove(task.id, type)} />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Mover para o próximo quadro</p>
@@ -159,7 +160,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => onDelete(task.id)}>
+              <AlertDialogAction onClick={() => onDelete(task.id, type)}>
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -169,3 +170,5 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
     </Card>
   );
 }
+
+    

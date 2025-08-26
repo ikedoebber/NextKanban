@@ -1,19 +1,19 @@
 
 'use client';
 
-import type { Board, BoardName, Task } from '@/types';
+import type { Board, BoardName, Task, ItemType } from '@/types';
 import { KanbanColumn } from './kanban-column';
 import { SortableContext } from '@dnd-kit/sortable';
 import { useMemo } from 'react';
 
 interface KanbanBoardProps {
   boards: Board[];
-  onAddTask: (boardId: BoardName, content: string) => void;
-  onEditTask: (taskId: string, newContent: string) => void;
-  onDeleteTask: (taskId: string) => void;
-  onMoveTask: (taskId: string) => void;
+  onAddTask: (boardId: BoardName, content: string, type: ItemType) => void;
+  onEditTask: (taskId: string, newContent: string, type: ItemType) => void;
+  onDeleteTask: (taskId: string, type: ItemType) => void;
+  onMoveTask: (taskId: string, type: ItemType) => void;
   activeTask: Task | null;
-  type: 'task' | 'goal';
+  type: ItemType;
 }
 
 export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, onMoveTask, activeTask, type }: KanbanBoardProps) {
@@ -38,3 +38,5 @@ export function KanbanBoard({ boards, onAddTask, onEditTask, onDeleteTask, onMov
     </div>
   );
 }
+
+    

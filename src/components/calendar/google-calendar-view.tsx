@@ -62,7 +62,7 @@ const timeSlots = generateTimeSlots();
 
 interface GoogleCalendarViewProps {
   events: CalendarEvent[];
-  onAddEvent: (eventData: Omit<CalendarEvent, 'id'>) => void;
+  onAddEvent: (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => void;
   onEditEvent: (eventId: string, updatedData: Partial<Omit<CalendarEvent, 'id'>>) => void;
   onDeleteEvent: (eventId: string) => void;
 }
@@ -82,7 +82,8 @@ export function GoogleCalendarView({
       onAddEvent({
         title: newEvent.title,
         date: newEvent.date,
-        time: `${newEvent.startTime} - ${newEvent.endTime}`
+        startTime: newEvent.startTime,
+        endTime: newEvent.endTime
       });
       setNewEvent({ title: '', date: '', startTime: '', endTime: '' });
       setIsAddDialogOpen(false);
@@ -228,17 +229,15 @@ interface CalendarEventItemProps {
 
 function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedEvent, setEditedEvent] = useState(() => {
-    const [startTime, endTime] = event.time.split(' - ');
-    return { ...event, startTime, endTime };
-  });
+  const [editedEvent, setEditedEvent] = useState(event);
 
   const handleSave = () => {
     if (editedEvent.startTime && editedEvent.endTime) {
       onEdit(event.id, { 
         title: editedEvent.title, 
         date: editedEvent.date, 
-        time: `${editedEvent.startTime} - ${editedEvent.endTime}` 
+        startTime: editedEvent.startTime, 
+        endTime: editedEvent.endTime,
       });
     }
     setIsEditing(false);
@@ -318,7 +317,7 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
               <Button size="sm" onClick={handleSave} className='h-8'>Salvar</Button>
             </div>
           ) : (
-            <span onClick={() => setIsEditing(true)}>{event.time}</span>
+            <span onClick={() => setIsEditing(true)}>{event.startTime} - {event.endTime}</span>
           )}
         </div>
       </div>
@@ -346,3 +345,5 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
     </div>
   );
 }
+
+    

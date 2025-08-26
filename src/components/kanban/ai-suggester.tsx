@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -19,12 +19,12 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import type { BoardName } from '@/types';
+import type { BoardName, ItemType } from '@/types';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface AiSuggesterProps {
-  onSuggested: (boardId: BoardName, content: string) => void;
+  onSuggested: (boardId: BoardName, content: string, type: ItemType) => void;
 }
 
 const formSchema = z.object({
@@ -77,7 +77,8 @@ export function AiSuggester({ onSuggested }: AiSuggesterProps) {
 
   const handleAcceptSuggestion = () => {
     if (suggestion) {
-      onSuggested(suggestion.suggestedBoard as BoardName, getValues('taskDescription'));
+      const formValues = getValues();
+      onSuggested(suggestion.suggestedBoard as BoardName, formValues.taskDescription, formValues.context as ItemType);
       resetAndClose();
     }
   };
