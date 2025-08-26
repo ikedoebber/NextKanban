@@ -70,10 +70,10 @@ export default function KanbanPage() {
       const q = query(collection(db, 'users', user.uid, collectionName), orderBy('order'));
       const querySnapshot = await getDocs(q);
       
-      const boardsData: { [key: string]: Board } = {};
-      initialData.forEach(b => {
-        boardsData[b.id] = { ...b, tasks: [] };
-      });
+      const boardsData = initialData.reduce((acc, b) => {
+        acc[b.id] = { ...b, tasks: [] };
+        return acc;
+      }, {} as { [key: string]: Board });
       
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -124,38 +124,57 @@ export default function KanbanPage() {
   const handleAddTask = async (boardId: BoardName, content: string, type: ItemType) => {
     if (!content.trim() || !user) return;
     
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(type);
+    const [currentBoards, setBoardsState, collectionName, initialData] = getBoardInfo(type);
     const board = currentBoards.find(b => b.id === boardId);
     if (!board) return;
 
-    const newTaskData = {
+    // Optimistic Update
+    const tempId = `temp-${Date.now()}`;
+    const newTask: Task = {
+      id: tempId,
       content,
       boardId,
       order: board.tasks.length,
       createdAt: new Date().toISOString(),
     };
 
+    setBoardsState(prev =>
+      prev.map(b =>
+        b.id === boardId
+          ? { ...b, tasks: [...b.tasks, newTask] }
+          : b
+      )
+    );
+
     try {
+      const newTaskData = {
+        content,
+        boardId,
+        order: board.tasks.length,
+        createdAt: newTask.createdAt,
+      };
       const docRef = await addDoc(collection(db, 'users', user.uid, collectionName), newTaskData);
-      const newTask: Task = { id: docRef.id, ...newTaskData };
       
-      setBoardsState(prev =>
-        prev.map(b =>
-          b.id === boardId
-            ? { ...b, tasks: [...b.tasks, newTask] }
-            : b
-        )
-      );
+      // Replace temporary task with real one from Firestore
+      setBoardsState(prev => prev.map(b => ({
+          ...b,
+          tasks: b.tasks.map(t => t.id === tempId ? { ...t, id: docRef.id } : t)
+      })));
+
     } catch (error) {
        console.error("Error adding document: ", error);
        toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar tarefa.'});
+       // Revert on error
+       fetchData(collectionName, setBoardsState, initialData);
     }
   };
 
   const handleEditTask = async (taskId: string, newContent: string, type: ItemType) => {
     if (!user) return;
-    const [, setBoardsState, collectionName] = getBoardInfo(type);
+    const [, setBoardsState, collectionName, initialData] = getBoardInfo(type);
     
+    const originalBoards = type === 'task' ? boards : goalsBoards;
+
     // Optimistic update
     setBoardsState(currentBoards =>
       currentBoards.map(board => ({
@@ -173,21 +192,21 @@ export default function KanbanPage() {
       console.error("Error updating document: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar tarefa.'});
       // Revert on error
-      const [, , , initialData] = getBoardInfo(type);
-      fetchData(collectionName, setBoardsState, initialData);
+      setBoardsState(originalBoards);
     }
   };
 
   const handleDeleteTask = async (taskId: string, type: ItemType) => {
     if (!user) return;
-    const [, setBoardsState, collectionName] = getBoardInfo(type);
+    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(type);
     
+    const originalBoards = [...currentBoards];
     // Optimistic update
-    setBoardsState(currentBoards =>
-      currentBoards.map(board => ({
-        ...board,
-        tasks: board.tasks.filter(task => task.id !== taskId),
-      }))
+    setBoardsState(prevBoards =>
+        prevBoards.map(board => ({
+            ...board,
+            tasks: board.tasks.filter(task => task.id !== taskId),
+        }))
     );
 
     try {
@@ -195,9 +214,7 @@ export default function KanbanPage() {
     } catch (error) {
       console.error("Error deleting document: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir tarefa.'});
-       // Revert on error
-       const [, , , initialData] = getBoardInfo(type);
-       fetchData(collectionName, setBoardsState, initialData);
+      setBoardsState(originalBoards);
     }
   };
   
@@ -226,24 +243,31 @@ export default function KanbanPage() {
   
     // Optimistic update
     setBoardsState((prevBoards) => {
-      const newBoards = prevBoards.map((b) => ({ ...b, tasks: [...b.tasks] }));
-  
-      const newSourceBoard = newBoards.find((b) => b.id === sourceBoard!.id);
-      const newDestBoard = newBoards.find((b) => b.id === destinationBoard.id);
-  
-      if (newSourceBoard && newDestBoard) {
-        newSourceBoard.tasks = newSourceBoard.tasks.filter((t) => t.id !== taskId);
-        newDestBoard.tasks.push({ ...taskToMove!, boardId: newDestBoard.id });
-      }
-  
+      const newBoards = [...prevBoards];
+      const sourceBoardTasks = newBoards[sourceBoardIndex].tasks.filter((t) => t.id !== taskId);
+      const destBoardTasks = [
+          ...newBoards[sourceBoardIndex + 1].tasks,
+          { ...taskToMove!, boardId: destinationBoard.id }
+      ];
+
+      newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceBoardTasks };
+      newBoards[sourceBoardIndex + 1] = { ...newBoards[sourceBoardIndex + 1], tasks: destBoardTasks };
+      
       return newBoards;
     });
   
     try {
+      const batch = writeBatch(db);
       const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
-      await updateDoc(taskRef, { boardId: destinationBoard.id });
-      // Refetch for consistency after successful update.
-      await fetchData(collectionName, setBoardsState, initialData);
+      batch.update(taskRef, { boardId: destinationBoard.id });
+      // Re-order tasks in destination board
+      destinationBoard.tasks.forEach((task, index) => {
+        const tRef = doc(db, 'users', user.uid, collectionName, task.id);
+        batch.update(tRef, { order: index });
+      });
+
+      await batch.commit();
+      fetchData(collectionName, setBoardsState, initialData);
     } catch (e) {
       console.error('Error moving task: ', e);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao mover tarefa.' });
@@ -287,12 +311,12 @@ export default function KanbanPage() {
   
     const [currentBoards, setBoardsState] = getBoardInfo(activeItemType);
   
-    // Find the source and destination boards
     const sourceBoard = findBoardForTask(activeId, currentBoards);
-    const overData = over.data.current;
-    const overIsBoard = overData?.type === 'Board';
     
-    const overItemType = overIsBoard ? overData.boardType : overData?.itemType;
+    const overIsBoard = over.data.current?.type === 'Board';
+    const overData = over.data.current;
+    
+    const overItemType = overIsBoard ? overData?.boardType : overData?.itemType;
     if (!overItemType || activeItemType !== overItemType) {
         return;
     }
@@ -306,28 +330,34 @@ export default function KanbanPage() {
     }
   
     setBoardsState(prev => {
-      const newBoards = prev.map(board => ({
-        ...board,
-        tasks: board.id === sourceBoard.id 
-          ? board.tasks.filter(task => task.id !== activeId)
-          : board.tasks,
-      }));
-  
       const taskToMove = sourceBoard.tasks.find(task => task.id === activeId);
       if (!taskToMove) return prev;
-  
+
+      const newBoards = [...prev];
+      const sourceBoardIndex = newBoards.findIndex(b => b.id === sourceBoard.id);
       const destBoardIndex = newBoards.findIndex(b => b.id === destinationBoard.id);
-      const destTaskIndex = overIsBoard 
-        ? newBoards[destBoardIndex].tasks.length 
-        : newBoards[destBoardIndex].tasks.findIndex(t => t.id === overId);
-  
-      if (destBoardIndex !== -1) {
-        newBoards[destBoardIndex].tasks.splice(destTaskIndex >= 0 ? destTaskIndex : newBoards[destBoardIndex].tasks.length, 0, {
-          ...taskToMove,
-          boardId: destinationBoard.id,
-        });
+      
+      // Remove from source
+      newBoards[sourceBoardIndex] = {
+        ...newBoards[sourceBoardIndex],
+        tasks: newBoards[sourceBoardIndex].tasks.filter(task => task.id !== activeId)
+      };
+
+      // Add to destination
+      const overTaskIndex = overIsBoard ? -1 : destinationBoard.tasks.findIndex(t => t.id === overId);
+      const newDestTasks = [...newBoards[destBoardIndex].tasks];
+
+      if(overTaskIndex !== -1) {
+          newDestTasks.splice(overTaskIndex, 0, {...taskToMove, boardId: destinationBoard.id});
+      } else {
+          newDestTasks.push({...taskToMove, boardId: destinationBoard.id});
       }
-  
+
+      newBoards[destBoardIndex] = {
+          ...newBoards[destBoardIndex],
+          tasks: newDestTasks
+      };
+
       return newBoards;
     });
   };
@@ -342,41 +372,41 @@ export default function KanbanPage() {
     
     const [currentBoards, setBoardsState, collectionName, initialData] = getBoardInfo(itemType);
     
-    // Find the state of boards after the optimistic dragOver update
-    const finalBoard = findBoardForTask(active.id as string, currentBoards);
+    const sourceBoardOnDragStart = findBoardForTask(active.id as string, itemType === 'task' ? boards : goalsBoards);
+    const destinationBoardOnDragEnd = findBoardForTask(active.id as string, currentBoards);
     
-    if (!finalBoard) {
-        // Task not found, something went wrong. Revert.
+    if (!destinationBoardOnDragEnd) {
         fetchData(collectionName, setBoardsState, initialData);
         return;
     }
-
-    const batch = writeBatch(db);
     
-    // Update all tasks in the final board to save new order and boardId
-    finalBoard.tasks.forEach((task, index) => {
-      const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
-      batch.update(taskRef, { boardId: finalBoard.id, order: index });
-    });
-    
-    // Also need to update order in the source board if it's different and has changed
-    const sourceBoardFromStart = findBoardForTask(active.id as string, itemType === 'task' ? boards : goalsBoards);
-    if (sourceBoardFromStart && sourceBoardFromStart.id !== finalBoard.id) {
-        const sourceBoardAfterDrag = currentBoards.find(b => b.id === sourceBoardFromStart.id);
-        sourceBoardAfterDrag?.tasks.forEach((task, index) => {
-            const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
-            batch.update(taskRef, { order: index });
-        });
+    if (sourceBoardOnDragStart?.id === destinationBoardOnDragEnd.id && destinationBoardOnDragEnd.tasks.length === sourceBoardOnDragStart.tasks.length) {
+      // Only order changed within the same board
     }
 
     try {
+      const batch = writeBatch(db);
+      
+      // Update tasks in the destination board
+      destinationBoardOnDragEnd.tasks.forEach((task, index) => {
+        const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
+        batch.update(taskRef, { boardId: destinationBoardOnDragEnd.id, order: index });
+      });
+      
+      // If task moved boards, update tasks in source board as well
+      if (sourceBoardOnDragStart && sourceBoardOnDragStart.id !== destinationBoardOnDragEnd.id) {
+          const sourceBoardNow = currentBoards.find(b => b.id === sourceBoardOnDragStart.id);
+          sourceBoardNow?.tasks.forEach((task, index) => {
+              const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
+              batch.update(taskRef, { order: index });
+          });
+      }
+
       await batch.commit();
-      // Data is now consistent, but a refetch can ensure everything is perfectly aligned.
-      fetchData(collectionName, setBoardsState, initialData);
+      fetchData(collectionName, setBoardsState, initialData); // Refetch for final consistency
     } catch (error) {
       console.error("Error updating tasks order: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a ordem das tarefas.' });
-      // Revert optimistic update on error
       fetchData(collectionName, setBoardsState, initialData);
     }
   };
