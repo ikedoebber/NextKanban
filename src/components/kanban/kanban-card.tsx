@@ -52,7 +52,7 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
     id: task.id,
     data: {
       type: 'Task',
-      taskType: type, // Pass the type here
+      itemType: type, // Pass the type here
       boardId,
     },
   });
@@ -170,5 +170,3 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
     </Card>
   );
 }
-
-    

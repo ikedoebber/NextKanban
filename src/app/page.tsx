@@ -97,7 +97,8 @@ export default function KanbanPage() {
       const querySnapshot = await getDocs(q);
       const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent));
       setCalendarEvents(events);
-    } catch (error) {
+    } catch (error)
+ {
       console.error("Error fetching calendar events: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao buscar compromissos.'});
     }
@@ -219,7 +220,7 @@ export default function KanbanPage() {
           const sourceBoard = newBoards[sourceBoardIndex];
           const destBoard = newBoards[sourceBoardIndex + 1];
           const [movedTask] = sourceBoard.tasks.splice(sourceTaskIndex, 1);
-          destBoard.tasks.push(movedTask);
+          destBoard.tasks.push({ ...movedTask, boardId: destBoard.id });
           return newBoards;
       });
     } catch(e) {
@@ -241,11 +242,11 @@ export default function KanbanPage() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const { id } = active;
-    const taskType = active.data.current?.type;
+    const itemType = active.data.current?.itemType;
 
-    if (!taskType) return;
+    if (!itemType) return;
     
-    const [sourceBoards] = getBoardInfo(taskType);
+    const [sourceBoards] = getBoardInfo(itemType);
     
     const [board, taskIndex] = findBoardForTask(id as string, sourceBoards);
     if(board && taskIndex > -1) {
@@ -262,23 +263,21 @@ export default function KanbanPage() {
   
     if (activeId === overId) return;
 
-    const activeTaskType = active.data.current?.type as ItemType;
-    if (!activeTaskType) return;
+    const activeItemType = active.data.current?.itemType as ItemType;
+    if (!activeItemType) return;
     
     const overData = over.data.current;
+    let overItemType = overData?.itemType;
     
-    const overType = overData?.type === 'Board' ? overData.boardType : overData?.type;
-    
-    if (overData?.type === 'Task') {
-      const overBoard = findBoardForTask(overId, getBoardInfo(activeTaskType)[0]);
-      if (!overBoard) return;
+    if (overData?.type === 'Board') {
+      overItemType = overData.boardType;
     }
 
-    if (!overType || activeTaskType !== overType) {
+    if (!overItemType || activeItemType !== overItemType) {
         return;
     }
     
-    const [, setBoardsState] = getBoardInfo(activeTaskType);
+    const [, setBoardsState] = getBoardInfo(activeItemType);
   
     setBoardsState(currentBoards => {
       const [sourceBoard, sourceTaskIndex] = findBoardForTask(activeId, currentBoards);
@@ -288,12 +287,12 @@ export default function KanbanPage() {
       let sourceBoardInNew = newBoards.find((b: Board) => b.id === sourceBoard.id);
       if (!sourceBoardInNew) return currentBoards;
 
-      const [activeTask] = sourceBoardInNew.tasks.splice(sourceTaskIndex, 1);
+      const [taskToMove] = sourceBoardInNew.tasks.splice(sourceTaskIndex, 1);
   
       if (overData?.type === 'Board') {
         const destinationBoard = newBoards.find((b: Board) => b.id === over.id);
         if(destinationBoard) {
-          destinationBoard.tasks.push(activeTask);
+          destinationBoard.tasks.push(taskToMove);
         }
       } else if (overData?.type === 'Task') {
         const [overBoard] = findBoardForTask(overId, newBoards);
@@ -301,7 +300,7 @@ export default function KanbanPage() {
         
         if (!destinationBoard) return currentBoards;
         const overTaskIndex = destinationBoard.tasks.findIndex(t => t.id === overId);
-        destinationBoard.tasks.splice(overTaskIndex, 0, activeTask);
+        destinationBoard.tasks.splice(overTaskIndex, 0, taskToMove);
       }
       return newBoards;
     });
@@ -312,14 +311,14 @@ export default function KanbanPage() {
     if (!over || !user || !active.data.current) return;
 
     const activeId = active.id as string;
-    const taskType = active.data.current.type as ItemType;
+    const itemType = active.data.current.itemType as ItemType;
 
-    if (!taskType) {
+    if (!itemType) {
       setActiveTask(null);
       return;
     }
 
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(taskType);
+    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(itemType);
     const [destBoardAfterDrag] = findBoardForTask(activeId, currentBoards);
 
     if (!destBoardAfterDrag) {
@@ -450,5 +449,3 @@ export default function KanbanPage() {
     </DndContext>
   );
 }
-
-    
