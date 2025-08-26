@@ -35,7 +35,7 @@ export default function SignupPage() {
         title: 'Cadastro bem-sucedido!',
         description: 'Sua conta foi criada. Você já pode fazer o login.',
       });
-      router.push('/');
+      router.push('/login');
     } catch (error: any) {
       let description = `Ocorreu um erro desconhecido. Código: ${error.code}`;
       switch (error.code) {
