@@ -10,13 +10,10 @@ const firebaseConfig = {
   storageBucket: "nextkanban-e4xlu.firebasestorage.app",
   apiKey: "AIzaSyA4qvxSpHrcfDuMm2egQFfcYMg10evMDdc",
   authDomain: "nextkanban-e4xlu.firebaseapp.com",
-  measurementId: "",
   messagingSenderId: "703891136551"
 };
 
 // Initialize Firebase
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-export { db, auth };
+export const db = getFirestore(app);
+export const auth = getAuth(app);
