@@ -16,6 +16,7 @@ import { GoogleCalendarView } from '@/components/calendar/google-calendar-view';
 import { Button } from '@/components/ui/button';
 import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { arrayMove } from '@dnd-kit/sortable';
 
 const initialBoards: Board[] = [
   { id: 'Não Iniciado', title: 'Não Iniciado', tasks: []},
@@ -125,66 +126,76 @@ export default function KanbanPage() {
   const handleAddTask = async (boardId: BoardName, content: string, type: ItemType) => {
     if (!content.trim() || !user) return;
     
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(type);
-    const board = currentBoards.find(b => b.id === boardId);
-    if (!board) return;
-
-    // Optimistic Update
-    const tempId = `temp-${Date.now()}`;
-    const newTask: Task = {
-      id: tempId,
-      content,
-      boardId,
-      order: board.tasks.length,
-      createdAt: new Date().toISOString(),
-    };
-
-    setBoardsState(prev =>
-      prev.map(b =>
-        b.id === boardId
-          ? { ...b, tasks: [...b.tasks, newTask] }
-          : b
-      )
-    );
-
-    try {
-      const newTaskData = {
+    const [, setBoardsState, collectionName] = getBoardInfo(type);
+    
+    // Get the current state to find the board and calculate the order
+    setBoardsState(currentBoards => {
+      const board = currentBoards.find(b => b.id === boardId);
+      if (!board) return currentBoards; // Return current state if board not found
+  
+      const tempId = `temp-${Date.now()}`;
+      const newTask: Task = {
+        id: tempId,
         content,
         boardId,
         order: board.tasks.length,
-        createdAt: newTask.createdAt,
+        createdAt: new Date().toISOString(),
       };
-      const docRef = await addDoc(collection(db, 'users', user.uid, collectionName), newTaskData);
-      
-      // Replace temporary task with real one from Firestore
-      setBoardsState(prev => prev.map(b => ({
-          ...b,
-          tasks: b.tasks.map(t => t.id === tempId ? { ...t, id: docRef.id } : t)
-      })));
-
-    } catch (error) {
-       console.error("Error adding document: ", error);
-       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar tarefa.'});
-       // Revert on error
-       setBoardsState(currentBoards);
-    }
+  
+      // Optimistic Update
+      const newBoards = currentBoards.map(b =>
+        b.id === boardId
+          ? { ...b, tasks: [...b.tasks, newTask] }
+          : b
+      );
+  
+      // Firestore operation in the background
+      (async () => {
+        try {
+          const newTaskData = {
+            content,
+            boardId,
+            order: newTask.order,
+            createdAt: newTask.createdAt,
+          };
+          const docRef = await addDoc(collection(db, 'users', user.uid, collectionName), newTaskData);
+          
+          // Replace temporary task with real one from Firestore
+          setBoardsState(prev => prev.map(b => ({
+              ...b,
+              tasks: b.tasks.map(t => t.id === tempId ? { ...t, id: docRef.id } : t)
+          })));
+  
+        } catch (error) {
+           console.error("Error adding document: ", error);
+           toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar tarefa.'});
+           // Revert on error by filtering out the temporary task
+           setBoardsState(prev => prev.map(b => ({
+               ...b,
+               tasks: b.tasks.filter(t => t.id !== tempId)
+           })));
+        }
+      })();
+  
+      return newBoards; // Return the optimistically updated state
+    });
   };
 
   const handleEditTask = async (taskId: string, newContent: string, type: ItemType) => {
     if (!user) return;
     const [, setBoardsState, collectionName] = getBoardInfo(type);
     
-    const originalBoards = type === 'task' ? boards : goalsBoards;
+    let originalBoards: Board[] | null = null;
 
-    // Optimistic update
-    setBoardsState(currentBoards =>
-      currentBoards.map(board => ({
+    setBoardsState(currentBoards => {
+      originalBoards = JSON.parse(JSON.stringify(currentBoards)); // Deep copy for potential revert
+      return currentBoards.map(board => ({
         ...board,
         tasks: board.tasks.map(task =>
           task.id === taskId ? { ...task, content: newContent } : task
         ),
-      }))
-    );
+      }));
+    });
 
     try {
       const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
@@ -192,30 +203,35 @@ export default function KanbanPage() {
     } catch (error) {
       console.error("Error updating document: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar tarefa.'});
-      // Revert on error
-      setBoardsState(originalBoards);
+      if (originalBoards) {
+        setBoardsState(originalBoards); // Revert on error
+      }
     }
   };
 
   const handleDeleteTask = async (taskId: string, type: ItemType) => {
     if (!user) return;
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(type);
+    const [, setBoardsState, collectionName] = getBoardInfo(type);
     
-    const originalBoards = [...currentBoards];
+    let originalBoards: Board[] | null = null;
+    
     // Optimistic update
-    setBoardsState(prevBoards =>
-        prevBoards.map(board => ({
-            ...board,
-            tasks: board.tasks.filter(task => task.id !== taskId),
-        }))
-    );
+    setBoardsState(currentBoards => {
+      originalBoards = JSON.parse(JSON.stringify(currentBoards));
+      return currentBoards.map(board => ({
+        ...board,
+        tasks: board.tasks.filter(task => task.id !== taskId),
+      }));
+    });
 
     try {
       await deleteDoc(doc(db, 'users', user.uid, collectionName, taskId));
     } catch (error) {
       console.error("Error deleting document: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir tarefa.'});
-      setBoardsState(originalBoards);
+      if (originalBoards) {
+        setBoardsState(originalBoards); // Revert on error
+      }
     }
   };
   
@@ -227,47 +243,58 @@ export default function KanbanPage() {
     let taskToMove: Task | undefined;
     let sourceBoardIndex = -1;
   
-    currentBoards.forEach((board, index) => {
+    // Find the task and its board
+    for (let i = 0; i < currentBoards.length; i++) {
+      const board = currentBoards[i];
       const task = board.tasks.find((t) => t.id === taskId);
       if (task) {
         sourceBoard = board;
         taskToMove = task;
-        sourceBoardIndex = index;
+        sourceBoardIndex = i;
+        break;
       }
-    });
-  
+    }
+    
     if (!taskToMove || !sourceBoard || sourceBoardIndex === -1 || sourceBoardIndex >= currentBoards.length - 1) {
-      return;
+      return; // Can't move from the last board or if not found
     }
   
     const destinationBoard = currentBoards[sourceBoardIndex + 1];
-    
     const originalBoards = JSON.parse(JSON.stringify(currentBoards));
   
     // Optimistic update
     setBoardsState((prevBoards) => {
       const newBoards = [...prevBoards];
-      const sourceBoardTasks = newBoards[sourceBoardIndex].tasks.filter((t) => t.id !== taskId);
-      const destBoardTasks = [
-          ...newBoards[sourceBoardIndex + 1].tasks,
-          { ...taskToMove!, boardId: destinationBoard.id }
-      ].sort((a, b) => a.order - b.order);
-
-      newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceBoardTasks };
-      newBoards[sourceBoardIndex + 1] = { ...newBoards[sourceBoardIndex + 1], tasks: destBoardTasks };
+      
+      // Remove from source board
+      const sourceTasks = newBoards[sourceBoardIndex].tasks.filter((t) => t.id !== taskId);
+      newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceTasks };
+      
+      // Add to destination board
+      const movedTask = { ...taskToMove!, boardId: destinationBoard.id, order: destinationBoard.tasks.length };
+      const destTasks = [...newBoards[sourceBoardIndex + 1].tasks, movedTask];
+      newBoards[sourceBoardIndex + 1] = { ...newBoards[sourceBoardIndex + 1], tasks: destTasks };
       
       return newBoards;
     });
   
+    // Update Firestore in the background
     try {
       const batch = writeBatch(db);
       const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
       batch.update(taskRef, { boardId: destinationBoard.id, order: destinationBoard.tasks.length });
+      
+      // Also update order of tasks in the source board if needed
+      originalBoards[sourceBoardIndex].tasks.filter(t => t.id !== taskId).forEach((task, index) => {
+        const tRef = doc(db, 'users', user.uid, collectionName, task.id);
+        batch.update(tRef, { order: index });
+      });
+
       await batch.commit();
     } catch (e) {
       console.error('Error moving task: ', e);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao mover tarefa.' });
-      setBoardsState(originalBoards);
+      setBoardsState(originalBoards); // Revert on failure
     }
   };
 
@@ -295,54 +322,52 @@ export default function KanbanPage() {
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over || !active) return;
-  
+
     const activeId = active.id as string;
     const overId = over.id as string;
-  
+
     if (activeId === overId) return;
-  
+
     const activeItemType = active.data.current?.itemType as ItemType | undefined;
     if (!activeItemType) return;
-  
-    const [currentBoards, setBoardsState] = getBoardInfo(activeItemType);
-  
-    const sourceBoard = findBoardForTask(activeId, currentBoards);
-    const overIsBoard = over.data.current?.type === 'Board';
-    
-    const overData = over.data.current;
-    const overItemType = overIsBoard ? overData?.boardType : overData?.itemType;
-    if (!overItemType || activeItemType !== overItemType) return;
 
-    const destinationBoard = overIsBoard
-      ? currentBoards.find(b => b.id === overId)
-      : findBoardForTask(overId, currentBoards);
-  
-    if (!sourceBoard || !destinationBoard || sourceBoard.id === destinationBoard.id) {
-      return;
-    }
-  
-    setBoardsState(prev => {
-      const taskToMove = sourceBoard.tasks.find(task => task.id === activeId);
-      if (!taskToMove) return prev;
+    const [, setBoardsState] = getBoardInfo(activeItemType);
 
-      const newBoards = [...prev];
-      const sourceBoardIndex = newBoards.findIndex(b => b.id === sourceBoard.id);
-      const destBoardIndex = newBoards.findIndex(b => b.id === destinationBoard.id);
-      
-      const sourceTasks = newBoards[sourceBoardIndex].tasks.filter(task => task.id !== activeId);
-      newBoards[sourceBoardIndex] = {...newBoards[sourceBoardIndex], tasks: sourceTasks};
-      
-      const overTaskIndex = destinationBoard.tasks.findIndex(t => t.id === overId);
-      const newDestTasks = [...newBoards[destBoardIndex].tasks];
+    setBoardsState((prevBoards) => {
+        const sourceBoard = findBoardForTask(activeId, prevBoards);
+        const overIsBoard = over.data.current?.type === 'Board';
+        const destinationBoard = overIsBoard
+            ? prevBoards.find(b => b.id === overId)
+            : findBoardForTask(overId, prevBoards);
 
-      if(overTaskIndex !== -1) {
-          newDestTasks.splice(overTaskIndex, 0, {...taskToMove, boardId: destinationBoard.id});
-      } else {
-          newDestTasks.push({...taskToMove, boardId: destinationBoard.id});
-      }
+        if (!sourceBoard || !destinationBoard || sourceBoard.id === destinationBoard.id) {
+            return prevBoards;
+        }
 
-      newBoards[destBoardIndex] = {...newBoards[destBoardIndex], tasks: newDestTasks};
-      return newBoards;
+        const taskToMove = sourceBoard.tasks.find(t => t.id === activeId);
+        if (!taskToMove) return prevBoards;
+
+        const newBoards = [...prevBoards];
+
+        // Remove from source
+        const sourceBoardIndex = newBoards.findIndex(b => b.id === sourceBoard.id);
+        const sourceTasks = newBoards[sourceBoardIndex].tasks.filter(task => task.id !== activeId);
+        newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceTasks };
+
+        // Add to destination
+        const destBoardIndex = newBoards.findIndex(b => b.id === destinationBoard.id);
+        let destTasks = [...newBoards[destBoardIndex].tasks];
+
+        const overIsTask = over.data.current?.type === 'Task';
+        if (overIsTask) {
+            const overTaskIndex = destTasks.findIndex(t => t.id === overId);
+            destTasks.splice(overTaskIndex, 0, { ...taskToMove, boardId: destinationBoard.id });
+        } else {
+            destTasks.push({ ...taskToMove, boardId: destinationBoard.id });
+        }
+        newBoards[destBoardIndex] = { ...newBoards[destBoardIndex], tasks: destTasks };
+
+        return newBoards;
     });
   };
 
@@ -357,6 +382,7 @@ export default function KanbanPage() {
     const [currentBoards, setBoardsState, collectionName] = getBoardInfo(itemType);
     const originalBoards = itemType === 'task' ? boards : goalsBoards;
     
+    const sourceBoardOnDragStart = findBoardForTask(active.id as string, originalBoards);
     const destinationBoardOnDragEnd = findBoardForTask(active.id as string, currentBoards);
     
     if (!destinationBoardOnDragEnd) {
@@ -364,19 +390,30 @@ export default function KanbanPage() {
         return;
     }
     
+    // The state is already updated optimistically by onDragOver.
+    // Now, just persist the changes to Firestore.
     try {
       const batch = writeBatch(db);
       
+      // Update all tasks in the destination board
       destinationBoardOnDragEnd.tasks.forEach((task, index) => {
         const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
         batch.update(taskRef, { boardId: destinationBoardOnDragEnd.id, order: index });
       });
 
+      // If the task moved boards, also update the source board tasks order
+      if (sourceBoardOnDragStart && sourceBoardOnDragStart.id !== destinationBoardOnDragEnd.id) {
+        sourceBoardOnDragStart.tasks.filter(t => t.id !== active.id).forEach((task, index) => {
+             const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
+             batch.update(taskRef, { order: index });
+        });
+      }
+
       await batch.commit();
     } catch (error) {
       console.error("Error updating tasks order: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a ordem das tarefas.' });
-      setBoardsState(originalBoards);
+      setBoardsState(originalBoards); // Revert on failure
     }
   };
   

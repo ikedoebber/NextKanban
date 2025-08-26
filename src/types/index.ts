@@ -4,6 +4,7 @@ export interface Task {
   content: string;
   boardId: BoardName;
   order: number;
+  createdAt?: string;
 }
 
 export type BoardName = 'Não Iniciado' | 'A Fazer' | 'Fazendo' | 'Feito' | 'Semanal' | 'Mensal' | 'Trimestral' | 'Anual';
@@ -24,5 +25,3 @@ export interface CalendarEvent {
 }
 
 export type ItemType = 'task' | 'goal';
-
-    
