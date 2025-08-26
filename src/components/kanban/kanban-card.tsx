@@ -6,7 +6,7 @@ import { Trash2, GripVertical } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import type { BoardName, Task, ItemType } from '@/types';
+import type { Task, ItemType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 interface KanbanCardProps {
   task: Task;
-  boardId: BoardName;
   onEdit: (taskId: string, newContent: string, type: ItemType) => void;
   onDelete: (taskId: string, type: ItemType) => void;
   onMove: (taskId: string, type: ItemType) => void;
@@ -36,7 +35,7 @@ interface KanbanCardProps {
   type: ItemType;
 }
 
-export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColumn, isDragging, type }: KanbanCardProps) {
+export function KanbanCard({ task, onEdit, onDelete, onMove, isLastColumn, isDragging, type }: KanbanCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(task.content);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -52,8 +51,8 @@ export function KanbanCard({ task, boardId, onEdit, onDelete, onMove, isLastColu
     id: task.id,
     data: {
       type: 'Task',
-      itemType: type, // Pass the type here
-      boardId,
+      itemType: type, 
+      task,
     },
   });
 

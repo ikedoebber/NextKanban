@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext as SortableListContext } from '@dnd-kit/sortable';
@@ -13,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { KanbanCard } from './kanban-card';
 import { AddTaskDialog } from './add-task-dialog';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
 import { ExampleCard } from './example-card';
 
 interface KanbanColumnProps {
@@ -76,7 +75,6 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMov
                     <KanbanCard
                       key={task.id}
                       task={task}
-                      boardId={board.id}
                       onEdit={onEditTask}
                       onDelete={onDeleteTask}
                       onMove={onMoveTask}
