@@ -88,7 +88,6 @@ export function KanbanColumn({ board, onAddTask, onEditTask, onDeleteTask, onMov
                 ) : (
                   <ExampleCard 
                     boardId={board.id}
-                    boardTitle={board.title}
                     type={type}
                     onAddTask={onAddTask}
                   />

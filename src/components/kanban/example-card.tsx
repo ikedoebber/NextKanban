@@ -20,12 +20,11 @@ const examples = {
 
 interface ExampleCardProps {
   boardId: BoardName;
-  boardTitle: string;
   type: ItemType;
   onAddTask: (boardId: BoardName, content: string, type: ItemType) => void;
 }
 
-export function ExampleCard({ boardId, boardTitle, type, onAddTask }: ExampleCardProps) {
+export function ExampleCard({ boardId, type, onAddTask }: ExampleCardProps) {
   const exampleContent = useMemo(() => {
     return examples[boardId as keyof typeof examples] || "Exemplo de tarefa...";
   }, [boardId]);
