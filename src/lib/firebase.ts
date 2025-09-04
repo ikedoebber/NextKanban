@@ -4,20 +4,26 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
+// Get Firebase configuration from environment variables
 const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+const projectId = process.env.FIREBASE_PROJECT_ID;
+const appId = process.env.FIREBASE_APP_ID;
+const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+const authDomain = process.env.FIREBASE_AUTH_DOMAIN;
+const messagingSenderId = process.env.FIREBASE_MESSAGING_SENDER_ID;
 
-if (!firebaseApiKey) {
-  throw new Error("NEXT_PUBLIC_FIREBASE_API_KEY is not set in the environment variables. Please provide it in your .env file.");
+if (!firebaseApiKey || !projectId || !appId || !storageBucket || !authDomain || !messagingSenderId) {
+  throw new Error("Firebase configuration is incomplete. Please check your .env file.");
 }
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  projectId: "nextkanban-e4xlu",
-  appId: "1:703891136551:web:8d558459c2a39e5e44ee02",
-  storageBucket: "nextkanban-e4xlu.firebasestorage.app",
+  projectId,
+  appId,
+  storageBucket,
   apiKey: firebaseApiKey,
-  authDomain: "nextkanban-e4xlu.firebaseapp.com",
-  messagingSenderId: "703891136551"
+  authDomain,
+  messagingSenderId
 };
 
 // Initialize Firebase

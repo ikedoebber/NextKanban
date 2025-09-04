@@ -4,9 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, writeBatch, addDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-
 
 import type { Board, Task, BoardName, CalendarEvent, ItemType } from '@/types';
 import { KanbanBoard } from '@/components/kanban/kanban-board';
@@ -14,9 +11,9 @@ import { AiSuggester } from '@/components/kanban/ai-suggester';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { GoogleCalendarView } from '@/components/calendar/google-calendar-view';
 import { Button } from '@/components/ui/button';
-import { auth, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { arrayMove } from '@dnd-kit/sortable';
+import { apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiMoveTask, apiReorderTasks, apiGetGoals, apiCreateGoal, apiUpdateGoal, apiDeleteGoal, organizeTasksIntoBoards } from '@/lib/api';
 
 const initialBoards: Board[] = [
   { id: 'Não Iniciado', title: 'Não Iniciado', tasks: []},
@@ -36,7 +33,8 @@ export default function KanbanPage() {
   const [boards, setBoards] = useState<Board[]>(initialBoards);
   const [goalsBoards, setGoalsBoards] = useState<Board[]>(initialGoalsBoards);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isClient, setIsClient] = useState(false);
@@ -45,67 +43,91 @@ export default function KanbanPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        router.push('/welcome');
-      }
-    });
+  }, []);
 
-    return () => unsubscribe();
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+        } else {
+          localStorage.removeItem('token');
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        localStorage.removeItem('token');
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    checkAuth();
   }, [router]);
 
   useEffect(() => {
-    if (user) {
-      fetchData('tasks', setBoards, initialBoards);
-      fetchData('goals', setGoalsBoards, initialGoalsBoards);
+    if (user && !loading) {
+      loadTasks();
+      loadGoals();
       fetchCalendarEvents();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, loading]);
 
-  const fetchData = async (collectionName: string, setState: React.Dispatch<React.SetStateAction<Board[]>>, initialData: Board[]) => {
-    if (!user) return;
+  const loadTasks = async () => {
+    if (!user?.id) return;
     try {
-      const q = query(collection(db, 'users', user.uid, collectionName), orderBy('order'));
-      const querySnapshot = await getDocs(q);
-      
-      const boardsData = initialData.map(b => ({ ...b, tasks: [] as Task[] }));
-      const boardMap = new Map(boardsData.map(b => [b.id, b]));
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const task = { id: doc.id, ...data } as Task;
-        const boardId = data.boardId as BoardName;
-        const board = boardMap.get(boardId);
-        if (board) {
-          board.tasks.push(task);
-        } else {
-            console.warn(`Board ID "${boardId}" from task ${task.id} not found in initial boards for ${collectionName}.`);
-        }
-      });
-
-      boardMap.forEach(b => b.tasks.sort((a, b) => a.order - b.order));
-      setState(Array.from(boardMap.values()));
-
+      const tasks = await apiGetTasks();
+      const organizedBoards = organizeTasksIntoBoards(tasks, initialBoards);
+      setBoards(organizedBoards);
     } catch (error) {
-      console.error(`Error fetching ${collectionName}: `, error);
-      toast({ variant: 'destructive', title: 'Erro', description: `Falha ao buscar ${collectionName}.`});
+      console.error('Error loading tasks:', error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao carregar tarefas.' });
+    }
+  };
+
+  const loadGoals = async () => {
+    if (!user?.id) return;
+    try {
+      const goals = await apiGetGoals();
+      const organizedBoards = organizeTasksIntoBoards(goals, initialGoalsBoards);
+      setGoalsBoards(organizedBoards);
+    } catch (error) {
+      console.error('Error loading goals:', error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao carregar metas.' });
     }
   };
 
   const fetchCalendarEvents = async () => {
-    if (!user) return;
+    if (!user?.id) return;
     try {
-      const q = query(collection(db, 'users', user.uid, 'calendarEvents'), orderBy('startTime'));
-      const querySnapshot = await getDocs(q);
-      const events = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent));
-      setCalendarEvents(events);
-    } catch (error)
- {
-      console.error("Error fetching calendar events: ", error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao buscar compromissos.'});
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/calendar', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch calendar events');
+      }
+      const events = await response.json();
+      setCalendarEvents(events.sort((a: CalendarEvent, b: CalendarEvent) => a.startTime.localeCompare(b.startTime)));
+    } catch (error) {
+      console.error('Error fetching calendar events:', error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao carregar compromissos.' });
     }
   };
 
@@ -117,127 +139,115 @@ export default function KanbanPage() {
     })
   );
 
-  const getBoardInfo = (type: ItemType): [Board[], React.Dispatch<React.SetStateAction<Board[]>>, string] => {
+  const getBoardInfo = (type: ItemType): [Board[], React.Dispatch<React.SetStateAction<Board[]>>] => {
     return type === 'goal' 
-      ? [goalsBoards, setGoalsBoards, 'goals'] 
-      : [boards, setBoards, 'tasks'];
+      ? [goalsBoards, setGoalsBoards] 
+      : [boards, setBoards];
   }
 
   const handleAddTask = async (boardId: BoardName, content: string, type: ItemType) => {
-    if (!content.trim() || !user) return;
+    if (!content.trim() || !user?.id) return;
     
-    const [, setBoardsState, collectionName] = getBoardInfo(type);
+    const [currentBoards, setBoardsState] = getBoardInfo(type);
+    const board = currentBoards.find(b => b.id === boardId);
+    if (!board) return;
     
-    // Get the current state to find the board and calculate the order
-    setBoardsState(currentBoards => {
-      const board = currentBoards.find(b => b.id === boardId);
-      if (!board) return currentBoards; // Return current state if board not found
-  
-      const tempId = `temp-${Date.now()}`;
-      const newTask: Task = {
-        id: tempId,
-        content,
-        boardId,
-        order: board.tasks.length,
-        createdAt: new Date().toISOString(),
-      };
-  
-      // Optimistic Update
-      const newBoards = currentBoards.map(b =>
-        b.id === boardId
-          ? { ...b, tasks: [...b.tasks, newTask] }
-          : b
-      );
-  
-      // Firestore operation in the background
-      (async () => {
-        try {
-          const newTaskData = {
-            content,
-            boardId,
-            order: newTask.order,
-            createdAt: newTask.createdAt,
-          };
-          const docRef = await addDoc(collection(db, 'users', user.uid, collectionName), newTaskData);
-          
-          // Replace temporary task with real one from Firestore
-          setBoardsState(prev => prev.map(b => ({
-              ...b,
-              tasks: b.tasks.map(t => t.id === tempId ? { ...t, id: docRef.id } : t)
-          })));
-  
-        } catch (error) {
-           console.error("Error adding document: ", error);
-           toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar tarefa.'});
-           // Revert on error by filtering out the temporary task
-           setBoardsState(prev => prev.map(b => ({
-               ...b,
-               tasks: b.tasks.filter(t => t.id !== tempId)
-           })));
-        }
-      })();
-  
-      return newBoards; // Return the optimistically updated state
-    });
-  };
-
-  const handleEditTask = async (taskId: string, newContent: string, type: ItemType) => {
-    if (!user) return;
-    const [, setBoardsState, collectionName] = getBoardInfo(type);
-    
-    let originalBoards: Board[] | null = null;
-
-    setBoardsState(currentBoards => {
-      originalBoards = JSON.parse(JSON.stringify(currentBoards)); // Deep copy for potential revert
-      return currentBoards.map(board => ({
-        ...board,
-        tasks: board.tasks.map(task =>
-          task.id === taskId ? { ...task, content: newContent } : task
-        ),
-      }));
-    });
-
     try {
-      const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
-      await updateDoc(taskRef, { content: newContent });
+      const newTask = type === 'goal' 
+        ? await apiCreateGoal(content, boardId)
+        : await apiCreateTask(content, boardId, 'task');
+      
+      // Update local state
+      setBoardsState(prevBoards => 
+        prevBoards.map(b => 
+          b.id === boardId 
+            ? { ...b, tasks: [...b.tasks, newTask] }
+            : b
+        )
+      );
+      
+      toast({
+        title: 'Sucesso',
+        description: `${type === 'goal' ? 'Meta' : 'Tarefa'} adicionada com sucesso!`,
+      });
     } catch (error) {
-      console.error("Error updating document: ", error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar tarefa.'});
-      if (originalBoards) {
-        setBoardsState(originalBoards); // Revert on error
-      }
+      console.error('Error adding task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: `Falha ao adicionar ${type === 'goal' ? 'meta' : 'tarefa'}.`,
+      });
     }
   };
 
-  const handleDeleteTask = async (taskId: string, type: ItemType) => {
-    if (!user) return;
-    const [, setBoardsState, collectionName] = getBoardInfo(type);
+  const handleEditTask = async (taskId: string, newContent: string, type: ItemType) => {
+    if (!user?.id) return;
     
-    let originalBoards: Board[] | null = null;
-    
-    // Optimistic update
-    setBoardsState(currentBoards => {
-      originalBoards = JSON.parse(JSON.stringify(currentBoards));
-      return currentBoards.map(board => ({
-        ...board,
-        tasks: board.tasks.filter(task => task.id !== taskId),
-      }));
-    });
-
     try {
-      await deleteDoc(doc(db, 'users', user.uid, collectionName, taskId));
-    } catch (error) {
-      console.error("Error deleting document: ", error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir tarefa.'});
-      if (originalBoards) {
-        setBoardsState(originalBoards); // Revert on error
+      if (type === 'goal') {
+        await apiUpdateGoal(taskId, newContent);
+      } else {
+        await apiUpdateTask(taskId, newContent, 'task');
       }
+      
+      const [, setBoardsState] = getBoardInfo(type);
+      setBoardsState(prevBoards => 
+        prevBoards.map(board => ({
+          ...board,
+          tasks: board.tasks.map(task => 
+            task.id === taskId ? { ...task, content: newContent } : task
+          )
+        }))
+      );
+      
+      toast({
+        title: 'Sucesso',
+        description: `${type === 'goal' ? 'Meta' : 'Tarefa'} atualizada com sucesso!`,
+      });
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: `Falha ao atualizar ${type === 'goal' ? 'meta' : 'tarefa'}.`,
+      });
+    }
+  };
+  const handleDeleteTask = async (taskId: string, type: ItemType) => {
+    if (!user?.id) return;
+    
+    try {
+      if (type === 'goal') {
+        await apiDeleteGoal(taskId);
+      } else {
+        await apiDeleteTask(taskId, 'task');
+      }
+      
+      const [, setBoardsState] = getBoardInfo(type);
+      setBoardsState(prevBoards => 
+        prevBoards.map(board => ({
+          ...board,
+          tasks: board.tasks.filter(task => task.id !== taskId)
+        }))
+      );
+      
+      toast({
+        title: 'Sucesso',
+        description: `${type === 'goal' ? 'Meta' : 'Tarefa'} excluída com sucesso!`,
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: `Falha ao excluir ${type === 'goal' ? 'meta' : 'tarefa'}.`,
+      });
     }
   };
   
   const handleMoveTaskToNextBoard = async (taskId: string, type: ItemType) => {
-    if (!user) return;
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(type);
+    if (!user?.id) return;
+    const [currentBoards, setBoardsState] = getBoardInfo(type);
   
     let sourceBoard: Board | undefined;
     let taskToMove: Task | undefined;
@@ -260,41 +270,41 @@ export default function KanbanPage() {
     }
   
     const destinationBoard = currentBoards[sourceBoardIndex + 1];
-    const originalBoards = JSON.parse(JSON.stringify(currentBoards));
   
-    // Optimistic update
-    setBoardsState((prevBoards) => {
-      const newBoards = [...prevBoards];
-      
-      // Remove from source board
-      const sourceTasks = newBoards[sourceBoardIndex].tasks.filter((t) => t.id !== taskId);
-      newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceTasks };
-      
-      // Add to destination board
-      const movedTask = { ...taskToMove!, boardId: destinationBoard.id, order: destinationBoard.tasks.length };
-      const destTasks = [...newBoards[sourceBoardIndex + 1].tasks, movedTask];
-      newBoards[sourceBoardIndex + 1] = { ...newBoards[sourceBoardIndex + 1], tasks: destTasks };
-      
-      return newBoards;
-    });
-  
-    // Update Firestore in the background
     try {
-      const batch = writeBatch(db);
-      const taskRef = doc(db, 'users', user.uid, collectionName, taskId);
-      batch.update(taskRef, { boardId: destinationBoard.id, order: destinationBoard.tasks.length });
+      if (type === 'goal') {
+        await apiMoveTask(taskId, destinationBoard.id as any, destinationBoard.tasks.length, 'goal');
+      } else {
+        await apiMoveTask(taskId, destinationBoard.id as any, destinationBoard.tasks.length, 'task');
+      }
       
-      // Also update order of tasks in the source board if needed
-      originalBoards[sourceBoardIndex].tasks.filter(t => t.id !== taskId).forEach((task, index) => {
-        const tRef = doc(db, 'users', user.uid, collectionName, task.id);
-        batch.update(tRef, { order: index });
+      // Update UI after successful database operation
+      setBoardsState((prevBoards) => {
+        const newBoards = [...prevBoards];
+        
+        // Remove from source board
+        const sourceTasks = newBoards[sourceBoardIndex].tasks.filter((t) => t.id !== taskId);
+        newBoards[sourceBoardIndex] = { ...newBoards[sourceBoardIndex], tasks: sourceTasks };
+        
+        // Add to destination board
+        const movedTask = { ...taskToMove!, boardId: destinationBoard.id, order: destinationBoard.tasks.length };
+        const destTasks = [...newBoards[sourceBoardIndex + 1].tasks, movedTask];
+        newBoards[sourceBoardIndex + 1] = { ...newBoards[sourceBoardIndex + 1], tasks: destTasks };
+        
+        return newBoards;
       });
-
-      await batch.commit();
-    } catch (e) {
-      console.error('Error moving task: ', e);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao mover tarefa.' });
-      setBoardsState(originalBoards); // Revert on failure
+      
+      toast({
+        title: 'Sucesso',
+        description: `${type === 'goal' ? 'Meta' : 'Tarefa'} movida com sucesso!`,
+      });
+    } catch (error) {
+      console.error('Error moving task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: `Falha ao mover ${type === 'goal' ? 'meta' : 'tarefa'}.`,
+      });
     }
   };
 
@@ -374,12 +384,12 @@ export default function KanbanPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
-    if (!over || !user || !active.data.current) return;
+    if (!over || !user?.id || !active.data.current) return;
 
     const itemType = active.data.current.itemType as ItemType | undefined;
     if (!itemType) return;
     
-    const [currentBoards, setBoardsState, collectionName] = getBoardInfo(itemType);
+    const [currentBoards, setBoardsState] = getBoardInfo(itemType);
     const originalBoards = itemType === 'task' ? boards : goalsBoards;
     
     const sourceBoardOnDragStart = findBoardForTask(active.id as string, originalBoards);
@@ -391,28 +401,34 @@ export default function KanbanPage() {
     }
     
     // The state is already updated optimistically by onDragOver.
-    // Now, just persist the changes to Firestore.
+    // Now, persist the changes to PostgreSQL.
     try {
-      const batch = writeBatch(db);
+      // Prepare task updates for reordering
+      const taskUpdates = destinationBoardOnDragEnd.tasks.map((task, index) => ({
+        id: task.id,
+        boardId: destinationBoardOnDragEnd.id,
+        order: index
+      }));
       
-      // Update all tasks in the destination board
-      destinationBoardOnDragEnd.tasks.forEach((task, index) => {
-        const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
-        batch.update(taskRef, { boardId: destinationBoardOnDragEnd.id, order: index });
-      });
-
-      // If the task moved boards, also update the source board tasks order
-      if (sourceBoardOnDragStart && sourceBoardOnDragStart.id !== destinationBoardOnDragEnd.id) {
-        sourceBoardOnDragStart.tasks.filter(t => t.id !== active.id).forEach((task, index) => {
-             const taskRef = doc(db, 'users', user.uid, collectionName, task.id);
-             batch.update(taskRef, { order: index });
-        });
+      const taskIds = destinationBoardOnDragEnd.tasks.map(task => task.id);
+      
+      if (itemType === 'goal') {
+        await apiReorderTasks(destinationBoardOnDragEnd.id, taskIds, 'goal');
+      } else {
+        await apiReorderTasks(destinationBoardOnDragEnd.id, taskIds, 'task');
       }
-
-      await batch.commit();
+      
+      toast({
+        title: 'Sucesso',
+        description: 'Ordem das tarefas atualizada com sucesso!',
+      });
     } catch (error) {
-      console.error("Error updating tasks order: ", error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao salvar a ordem das tarefas.' });
+      console.error('Error updating tasks order:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Falha ao salvar a ordem das tarefas.',
+      });
       setBoardsState(originalBoards); // Revert on failure
     }
   };
@@ -432,15 +448,28 @@ export default function KanbanPage() {
     setCalendarEvents(prev => [...prev, newEventData].sort((a,b) => a.startTime.localeCompare(b.startTime)));
 
     try {
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'calendarEvents'), {
-        title: newEventData.title,
-        date: newEventData.date,
-        startTime: newEventData.startTime,
-        endTime: newEventData.endTime,
-        createdAt: newEventData.createdAt,
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/calendar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: newEventData.title,
+          date: newEventData.date,
+          startTime: newEventData.startTime,
+          endTime: newEventData.endTime,
+        }),
       });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create event');
+      }
+      
+      const createdEvent = await response.json();
       // Replace temp id with real one
-      setCalendarEvents(prev => prev.map(e => e.id === tempId ? {...e, id: docRef.id} : e));
+      setCalendarEvents(prev => prev.map(e => e.id === tempId ? {...e, id: createdEvent.id} : e));
     } catch (error) {
       console.error("Error adding event: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao adicionar compromisso.'});
@@ -460,7 +489,17 @@ export default function KanbanPage() {
       );
 
      try {
-       await updateDoc(doc(db, 'users', user.uid, 'calendarEvents', eventId), updatedData);
+       const response = await fetch(`/api/calendar/${eventId}`, {
+         method: 'PUT',
+         headers: {
+           'Content-Type': 'application/json',
+         },
+         body: JSON.stringify(updatedData),
+       });
+       
+       if (!response.ok) {
+         throw new Error('Failed to update event');
+       }
      } catch (error) {
        console.error("Error updating event: ", error);
        toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao editar compromisso.'});
@@ -474,7 +513,13 @@ export default function KanbanPage() {
     // Optimistic update
     setCalendarEvents(prev => prev.filter(event => event.id !== eventId));
     try {
-      await deleteDoc(doc(db, 'users', user.uid, 'calendarEvents', eventId));
+      const response = await fetch(`/api/calendar/${eventId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete event');
+      }
     } catch (error) {
       console.error("Error deleting event: ", error);
       toast({ variant: 'destructive', title: 'Erro', description: 'Falha ao excluir compromisso.'});
@@ -483,13 +528,16 @@ export default function KanbanPage() {
   };
   
   const handleLogout = () => {
-    auth.signOut();
-    router.push('/welcome');
+    localStorage.removeItem('token');
+    router.push('/login');
   };
 
+  if (!isClient || loading) {
+    return <div className="flex items-center justify-center h-screen">Carregando...</div>;
+  }
 
-  if (!isClient || !user) {
-    return null; // ou um esqueleto de carregamento
+  if (!user) {
+    return null;
   }
 
   return (

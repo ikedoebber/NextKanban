@@ -4,51 +4,50 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { auth } from '@/lib/firebase';
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: 'Login bem-sucedido!',
-        description: 'Bem-vindo de volta.',
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
       });
-      router.push('/');
-    } catch (error: any) {
-      let description = `Ocorreu um erro desconhecido. Código: ${error.code}`;
-      switch (error.code) {
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          description = 'Email ou senha inválidos.';
-          break;
-        case 'auth/invalid-email':
-          description = 'O formato do email é inválido.';
-          break;
-        case 'auth/too-many-requests':
-          description = 'Muitas tentativas de login. Tente novamente mais tarde.';
-          break;
-        case 'auth/network-request-failed':
-          description = 'Erro de rede. Verifique sua conexão com a internet.';
-          break;
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro de Login',
+          description: data.error || 'Usuário ou senha inválidos.',
+        });
+      } else {
+        localStorage.setItem('token', data.token);
+        toast({
+          title: 'Login bem-sucedido!',
+          description: 'Bem-vindo de volta.',
+        });
+        router.push('/');
       }
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro de Login',
-        description,
+        description: 'Ocorreu um erro inesperado. Tente novamente.',
       });
     }
   };
@@ -63,13 +62,13 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Usuário</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="seu_usuario"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
               />
             </div>
@@ -88,12 +87,7 @@ export default function LoginPage() {
               Entrar
             </Button>
           </form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Não tem uma conta?{' '}
-            <Link href="/signup" className="text-primary hover:underline">
-              Cadastre-se
-            </Link>
-          </p>
+
         </CardContent>
       </Card>
     </div>

@@ -36,15 +36,25 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+// Generate days of month (1-31)
+const daysOfMonth = Array.from({ length: 31 }, (_, i) => i + 1);
+
+// Days of the week in Portuguese
 const daysOfWeek = [
-  'Segunda-feira',
+  'Domingo',
+  'Segunda-feira', 
   'Terça-feira',
   'Quarta-feira',
   'Quinta-feira',
   'Sexta-feira',
-  'Sábado',
-  'Domingo',
+  'Sábado'
 ];
+
+// Helper function to get day of week from date string
+const getDayOfWeek = (dateString: string) => {
+  const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+  return daysOfWeek[date.getDay()];
+};
 
 const generateTimeSlots = () => {
     const slots = [];
@@ -131,25 +141,25 @@ export function GoogleCalendarView({
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="date" className="text-right">
-                    Dia
+                    Data
                   </Label>
-                  <Select
+                  <Input
+                    id="date"
                     name="date"
+                    type="date"
+                    className="col-span-3"
                     required
                     value={newEvent.date}
-                    onValueChange={value => handleNewEventChange('date', value)}
-                  >
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue placeholder="Selecione um dia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {daysOfWeek.map(day => (
-                        <SelectItem key={day} value={day}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={e => handleNewEventChange('date', e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="dayOfWeek" className="text-right">
+                    Dia da Semana
+                  </Label>
+                  <div className="col-span-3 p-2 bg-muted rounded-md text-sm">
+                    {newEvent.date ? getDayOfWeek(newEvent.date) : 'Selecione uma data'}
+                  </div>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label className="text-right">Início</Label>
@@ -251,33 +261,14 @@ function CalendarEventItem({ event, onEdit, onDelete }: CalendarEventItemProps) 
     setEditedEvent(prev => ({...prev, [field]: value}));
   };
   
-  const handleSelectChange = (value: string) => {
-    handleInputChange('date', value);
-    // We can save immediately on change
-    onEdit(event.id, { ...editedEvent, date: value });
-  };
+
 
   return (
     <div className="group flex items-start gap-4 p-3 rounded-lg bg-secondary/70 hover:bg-secondary transition-colors">
       <div className="flex flex-col items-center justify-center h-full p-2 bg-primary/20 rounded-md w-28 shrink-0">
-        {isEditing ? (
-            <Select value={editedEvent.date} onValueChange={handleSelectChange}>
-            <SelectTrigger className="h-8 text-center">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {daysOfWeek.map(day => (
-                <SelectItem key={day} value={day}>
-                  {day}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <p className="font-semibold text-sm text-primary-foreground" onClick={() => setIsEditing(true)}>
-            {event.date}
-          </p>
-        )}
+        <p className="font-semibold text-sm text-primary-foreground">
+          {getDayOfWeek(event.date)}
+        </p>
       </div>
       <div className="flex-1 py-2">
         {isEditing ? (
