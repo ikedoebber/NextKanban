@@ -27,7 +27,6 @@ logs/
 .gitattributes
 
 # Docker
-Dockerfile*
 .dockerignore
 docker-compose*.yml
 
