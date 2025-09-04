@@ -179,6 +179,15 @@ docker-compose up --build nextkanban -d
 docker-compose down -v
 ```
 
+### Arquivos de Configuração Docker
+
+- **`docker-compose.yml`**: Configuração principal com PostgreSQL + NextKanban
+- **`docker-compose.override.yml`**: Configurações específicas para deploy (EasyPanel)
+- **`docker-compose.dev.yml`**: Apenas PostgreSQL para desenvolvimento local
+- **`docker-compose.postgres.yml`**: PostgreSQL standalone
+- **`Dockerfile`**: Imagem da aplicação NextKanban
+- **`.dockerignore`**: Arquivos excluídos do contexto de build
+
 ### Acesso ao Banco de Dados
 ```bash
 # Via Docker
@@ -205,6 +214,11 @@ docker network inspect nextkanban_nextkanban-network
 ```
 
 ## 🔧 Troubleshooting
+
+### Erro "Dockerfile not found" no deploy
+- ✅ O projeto inclui um `docker-compose.override.yml` que garante o contexto correto
+- ✅ Verificar se o arquivo `Dockerfile` está no repositório: `git ls-files | grep Dockerfile`
+- ✅ Confirmar que `.dockerignore` não está excluindo o `Dockerfile`
 
 ### Erro de conexão com banco
 - ✅ Verifique se o PostgreSQL está rodando: `docker-compose ps postgres`
