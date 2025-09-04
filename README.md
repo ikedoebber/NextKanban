@@ -97,7 +97,7 @@ JWT_SECRET=seu-jwt-secret-aqui
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) em seu navegador para ver a aplicação em funcionamento.
+Abra [http://localhost:48321](http://localhost:48321) em seu navegador para ver a aplicação em funcionamento.
 
 ### 5. Primeiro Acesso
 
