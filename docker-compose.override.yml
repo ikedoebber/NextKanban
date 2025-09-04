@@ -1,6 +1,3 @@
-# Docker Compose Override para EasyPanel
-# Este arquivo garante que o build funcione corretamente no ambiente de deploy
-
 version: "3.9"
 
 services:
