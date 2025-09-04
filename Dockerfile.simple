@@ -1,0 +1,30 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de dependência
+COPY package*.json ./
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código fonte
+COPY . .
+
+# Build da aplicação
+RUN npm run build
+
+# Expor porta
+EXPOSE 48321
+
+# Variáveis de ambiente
+ENV NODE_ENV=production
+ENV PORT=48321
+
+# Comando de inicialização
+CMD ["npm", "start"]

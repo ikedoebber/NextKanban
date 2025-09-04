@@ -216,9 +216,29 @@ docker network inspect nextkanban_nextkanban-network
 ## 🔧 Troubleshooting
 
 ### Erro "Dockerfile not found" no deploy
-- ✅ O projeto inclui um `docker-compose.override.yml` que garante o contexto correto
-- ✅ Verificar se o arquivo `Dockerfile` está no repositório: `git ls-files | grep Dockerfile`
-- ✅ Confirmar que `.dockerignore` não está excluindo o `Dockerfile`
+
+**Soluções implementadas:**
+- ✅ `docker-compose.override.yml` - Garante contexto correto
+- ✅ `docker-compose.production.yml` - Versão standalone para EasyPanel
+- ✅ `Dockerfile.simple` - Versão simplificada como backup
+- ✅ `.dockerignore` corrigido - Não exclui mais o Dockerfile
+
+**Para EasyPanel especificamente:**
+1. Use `docker-compose.production.yml` ao invés do padrão
+2. Ou renomeie `Dockerfile.simple` para `Dockerfile` se persistir o erro
+3. Verifique se o repositório está atualizado no EasyPanel
+
+**Comandos de verificação:**
+```bash
+# Verificar se Dockerfile está no repositório
+git ls-files | grep Dockerfile
+
+# Testar build local
+docker build -t nextkanban-test .
+
+# Usar arquivo de produção
+docker-compose -f docker-compose.production.yml up --build -d
+```
 
 ### Erro de conexão com banco
 - ✅ Verifique se o PostgreSQL está rodando: `docker-compose ps postgres`
