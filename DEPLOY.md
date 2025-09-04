@@ -95,14 +95,41 @@ npm start
 
 ## 🐳 Deploy com Docker
 
-### 1. Build da imagem
+### Opção 1: Sistema Completo com Docker Compose (Recomendado)
+
 ```bash
-docker build -t nextkanban .
+# 1. Clone o repositório
+git clone <seu-repositorio>
+cd NextKanban
+
+# 2. Inicie todo o sistema (PostgreSQL + NextKanban)
+docker-compose up --build -d
+
+# OU use o script automatizado (Windows)
+.\start-system.ps1
 ```
 
-### 2. Executar com docker-compose
+**O que o docker-compose.yml faz:**
+- 🗄️ Inicia PostgreSQL com configurações otimizadas
+- 🚀 Constrói e inicia a aplicação NextKanban
+- 🔗 Configura rede interna entre os serviços
+- ⚡ Healthcheck automático do banco
+- 📊 Volumes persistentes para dados
+
+### Opção 2: Apenas PostgreSQL
+
 ```bash
-# Para produção, crie um docker-compose.prod.yml
+# Para desenvolvimento local
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+### Opção 3: Build Manual
+
+```bash
+# 1. Build da imagem
+docker build -t nextkanban .
+
+# 2. Executar com docker-compose
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -125,22 +152,89 @@ docker-compose -f docker-compose.prod.yml up -d
    npm run dev # ou pm2 logs se usando PM2
    ```
 
+## 📋 Comandos Úteis
+
+### Docker Compose
+```bash
+# Iniciar sistema completo
+docker-compose up --build -d
+
+# Ver logs em tempo real
+docker-compose logs -f
+
+# Ver logs de um serviço específico
+docker-compose logs -f nextkanban
+docker-compose logs -f postgres
+
+# Parar sistema
+docker-compose down
+
+# Reiniciar sistema
+docker-compose restart
+
+# Reconstruir apenas um serviço
+docker-compose up --build nextkanban -d
+
+# Remover volumes (CUIDADO: apaga dados!)
+docker-compose down -v
+```
+
+### Acesso ao Banco de Dados
+```bash
+# Via Docker
+docker-compose exec postgres psql -U nextkanban_user -d nextkanban
+
+# Via cliente local
+psql -h localhost -U nextkanban_user -d nextkanban
+
+# Executar script SQL
+docker-compose exec postgres psql -U nextkanban_user -d nextkanban -f /path/to/script.sql
+```
+
+### Monitoramento
+```bash
+# Status dos containers
+docker-compose ps
+
+# Uso de recursos
+docker stats
+
+# Inspecionar rede
+docker network ls
+docker network inspect nextkanban_nextkanban-network
+```
+
 ## 🔧 Troubleshooting
 
 ### Erro de conexão com banco
-- Verifique se o PostgreSQL está rodando
-- Confirme as credenciais no `.env.local`
-- Teste a conexão: `psql -U nextkanban_user -d nextkanban -h localhost`
+- ✅ Verifique se o PostgreSQL está rodando: `docker-compose ps postgres`
+- ✅ Confirme as credenciais no `.env.production`
+- ✅ Teste a conexão: `docker-compose exec postgres psql -U nextkanban_user -d nextkanban`
+- ✅ Verifique logs: `docker-compose logs postgres`
 
-### Erro de autenticação
-- Verifique se a extensão `pgcrypto` está habilitada
-- Confirme se os usuários foram criados corretamente
-- Verifique se a coluna `email` é opcional
+### Erro de build do Docker
+- ✅ Limpe imagens antigas: `docker system prune -a`
+- ✅ Verifique se todas as variáveis estão no Dockerfile
+- ✅ Reconstrua sem cache: `docker-compose build --no-cache`
+- ✅ Verifique logs de build: `docker-compose logs nextkanban`
 
-### Erro 401 nas APIs
-- Verifique se o `NEXTAUTH_SECRET` está configurado
-- Confirme se a sessão está sendo criada corretamente
-- Teste o login novamente
+### Problemas de autenticação
+- ✅ Verifique se `NEXTAUTH_SECRET` está definido
+- ✅ Confirme se `NEXTAUTH_URL` está correto (http://localhost:48321)
+- ✅ Teste criação de usuário com o script SQL
+- ✅ Verifique se a extensão pgcrypto está habilitada
+
+### Container não inicia
+- ✅ Verifique portas em uso: `netstat -an | findstr :48321`
+- ✅ Verifique logs detalhados: `docker-compose logs --details nextkanban`
+- ✅ Teste dependências: `docker-compose up postgres` primeiro
+- ✅ Verifique espaço em disco: `docker system df`
+
+### Performance lenta
+- ✅ Monitore recursos: `docker stats`
+- ✅ Verifique logs de erro: `docker-compose logs | grep ERROR`
+- ✅ Reinicie containers: `docker-compose restart`
+- ✅ Otimize banco: Execute `VACUUM ANALYZE;` no PostgreSQL
 
 ## 📞 Suporte
 
