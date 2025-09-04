@@ -3,6 +3,8 @@ node_modules
 
 # Saída de construção do Next.js
 .next
+.next/
+out/
 
 # Arquivos de log
 *.log
@@ -10,6 +12,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+logs/
 
 # Variáveis de ambiente
 .env
@@ -18,9 +21,42 @@ pnpm-debug.log*
 .env.test.local
 .env.production.local
 
-# Arquivos do Docker
-Dockerfile
-.dockerignore
+# Git
+.git
+.gitignore
+.gitattributes
 
-# Outros
-README.md
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# IDE e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Desenvolvimento
+.modified
+*.md
+docs/
+.idx/
+
+# Arquivos de configuração de desenvolvimento
+.firebaserc
+apphosting.yaml
+setup_postgres.*
+migrate_to_username.sql
+create_user.sql
+DEPLOY.md
