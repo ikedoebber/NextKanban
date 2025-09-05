@@ -9,8 +9,28 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json* ./
 RUN npm ci --ignore-scripts && npm cache clean --force
+
+# Accept build arguments
+ARG GEMINI_API_KEY
+ARG DATABASE_URL
+ARG DB_PATH
+ARG NEXTAUTH_SECRET
+ARG NEXTAUTH_URL
+ARG JWT_SECRET
+ARG GIT_SHA
+
+# Set environment variables from build arguments
+ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+ENV DATABASE_URL=${DATABASE_URL}
+ENV DB_PATH=${DB_PATH}
+ENV NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+ENV NEXTAUTH_URL=${NEXTAUTH_URL}
+ENV JWT_SECRET=${JWT_SECRET}
+ENV GIT_SHA=${GIT_SHA}
+ENV NODE_ENV=production 
+ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY . .
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM node:20.11.1-slim AS runner
