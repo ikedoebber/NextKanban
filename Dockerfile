@@ -1,70 +1,49 @@
 # ===============================
-# Stage 1: Base com dependências
+# Stage 1: Build
 # ===============================
-FROM node:20.11.1-slim AS base
+FROM node:20.11.1-slim AS builder
+
+# Diretório de trabalho
 WORKDIR /app
 
-# Instala dependências do sistema necessárias para build de pacotes nativos
+# Instala dependências de sistema para pacotes nativos
 RUN apt-get update && \
-    apt-get install -y dumb-init python3 make g++ build-essential && \
+    apt-get install -y python3 make g++ build-essential libc6-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Copia package.json e package-lock.json
 COPY package.json package-lock.json* ./
 
-# Instala todas as dependências (dev + prod) sem rodar scripts ainda
-RUN npm ci --ignore-scripts
+# Instala todas as dependências (incluindo devDependencies)
+RUN npm install
 
-# ===============================
-# Stage 2: Builder
-# ===============================
-FROM base AS builder
-WORKDIR /app
-
-# Copia o resto do código
+# Copia todo o código
 COPY . .
 
-# Recompila better-sqlite3 para o ambiente atual
+# Recompila better-sqlite3 (necessário no build)
 RUN npm rebuild better-sqlite3 --build-from-source
 
 # Build do Next.js
 RUN npm run build
 
 # ===============================
-# Stage 3: Runner / Produção
+# Stage 2: Produção
 # ===============================
-FROM node:20.11.1-slim AS runner
+FROM node:20.11.1-slim AS production
+
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV PORT=48321
-ENV NEXT_TELEMETRY_DISABLED=1
+# Copia apenas os artefatos necessários do stage de build
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/init-sqlite.js ./init-sqlite.js
+COPY --from=builder /app/data ./data
 
-# Instala dumb-init (para receber sinais corretamente)
-RUN apt-get update && \
-    apt-get install -y dumb-init && \
-    rm -rf /var/lib/apt/lists/*
-
-# Cria usuário não-root
-RUN groupadd -g 1001 nodejs && useradd -r -u 1001 -g nodejs nextjs
-
-# Copia node_modules já compiladas e build do Next.js
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/init-sqlite.js ./init-sqlite.js
-
-# Cria diretório de dados para SQLite
-RUN mkdir -p data && chown nextjs:nodejs data
-
-# Define usuário não-root
-USER nextjs
-
-# Inicializa banco SQLite
-RUN node init-sqlite.js
-
-# Expõe porta do Next.js
+# Expõe a porta que o Next.js vai rodar
 EXPOSE 48321
 
-# Comando para iniciar o Next.js em produção
-CMD ["dumb-init", "next", "start", "-p", "48321"]
+# Comando padrão
+CMD ["npm", "start"]
