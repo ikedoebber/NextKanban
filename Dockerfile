@@ -35,7 +35,12 @@ ENV GIT_SHA=${GIT_SHA}
 ENV NODE_ENV=production 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Create data directory for build process
+RUN mkdir -p data
+
 COPY . .
+
+# Build the application
 RUN npm run build
 
 FROM node:20.11.1-slim AS runner
