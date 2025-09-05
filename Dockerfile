@@ -3,6 +3,9 @@
 # ===============================
 FROM node:20.11.1-alpine3.19
 
+# Instala ferramentas para compilar pacotes nativos
+RUN apk add --no-cache python3 g++ make
+
 # ===============================
 # Diretório de trabalho
 # ===============================
@@ -10,7 +13,6 @@ WORKDIR /app
 
 # ===============================
 # Copia apenas package.json e package-lock.json
-# para instalar dependências primeiro (cache do Docker)
 # ===============================
 COPY package.json package-lock.json* ./
 
@@ -21,19 +23,19 @@ COPY package.json package-lock.json* ./
 RUN npm install --ignore-scripts
 
 # ===============================
-# Copia todo o código do projeto
+# Copia o restante do código
 # ===============================
 COPY . .
 
 # ===============================
-# Roda scripts que dependem do código
-# ===============================
-RUN npm run init-db
-
-# ===============================
-# Rebuild do better-sqlite3 no container
+# Rebuild do better-sqlite3 antes de usar
 # ===============================
 RUN npm rebuild better-sqlite3 --build-from-source
+
+# ===============================
+# Inicializa o banco de dados
+# ===============================
+RUN npm run init-db
 
 # ===============================
 # Build do Next.js
@@ -41,7 +43,7 @@ RUN npm rebuild better-sqlite3 --build-from-source
 RUN npm run build
 
 # ===============================
-# Porta que o container vai expor
+# Porta do container
 # ===============================
 EXPOSE 48321
 
