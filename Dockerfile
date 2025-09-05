@@ -50,7 +50,10 @@ RUN apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/
 RUN groupadd -g 1001 nodejs && useradd -r -u 1001 -g nodejs nextjs
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Only copy public directory if it exists
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public 2>/dev/null || echo "Public directory not found, skipping..."
+
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/init-sqlite.js ./init-sqlite.js
 RUN mkdir -p data && chown nextjs:nodejs data
