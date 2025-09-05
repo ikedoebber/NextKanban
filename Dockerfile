@@ -1,10 +1,15 @@
 # ===============================
 # Base image
 # ===============================
-FROM node:20.11.1-alpine3.19
+FROM node:20.11.1-slim
 
-# Instala ferramentas para compilar pacotes nativos
-RUN apk add --no-cache python3 g++ make
+# Instala ferramentas necessárias
+RUN apt-get update && apt-get install -y \
+    python3 \
+    g++ \
+    make \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # ===============================
 # Diretório de trabalho
@@ -12,13 +17,12 @@ RUN apk add --no-cache python3 g++ make
 WORKDIR /app
 
 # ===============================
-# Copia apenas package.json e package-lock.json
+# Copia package.json e package-lock.json
 # ===============================
 COPY package.json package-lock.json* ./
 
 # ===============================
-# Instala todas as dependências (dev + prod)
-# sem rodar scripts ainda
+# Instala todas as dependências sem rodar scripts
 # ===============================
 RUN npm install --ignore-scripts
 
@@ -28,7 +32,7 @@ RUN npm install --ignore-scripts
 COPY . .
 
 # ===============================
-# Rebuild do better-sqlite3 antes de usar
+# Rebuild better-sqlite3
 # ===============================
 RUN npm rebuild better-sqlite3 --build-from-source
 
@@ -38,7 +42,7 @@ RUN npm rebuild better-sqlite3 --build-from-source
 RUN npm run init-db
 
 # ===============================
-# Build do Next.js
+# Build Next.js
 # ===============================
 RUN npm run build
 
