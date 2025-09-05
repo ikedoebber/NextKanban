@@ -14,12 +14,24 @@ yarn-error.log*
 pnpm-debug.log*
 logs/
 
-# Variáveis de ambiente
+# Variáveis de ambiente e secrets
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.example
+
+# Credenciais e secrets
+.aws/
+.npmrc
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
 
 # Git
 .git
@@ -28,7 +40,7 @@ logs/
 
 # Docker
 .dockerignore
-docker-compose*.yml
+# Arquivos de configuração desnecessários
 
 # IDE e editores
 .vscode/
@@ -52,10 +64,29 @@ Thumbs.db
 docs/
 .idx/
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Testing
+__tests__/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+jest.config.js
+coverage/
+.nyc_output
+
+# Cache directories
+.cache
+.parcel-cache
+.npm
+.eslintcache
+
 # Arquivos de configuração de desenvolvimento
 .firebaserc
 apphosting.yaml
-setup_postgres.*
-migrate_to_username.sql
-create_user.sql
 DEPLOY.md

@@ -10,11 +10,11 @@ if (Test-Path "Dockerfile") {
     Write-Host "❌ Dockerfile" -ForegroundColor Red
 }
 
-# Verificar docker-compose.yml
-if (Test-Path "docker-compose.yml") {
-    Write-Host "✅ docker-compose.yml" -ForegroundColor Green
+# Verificar .env.example
+if (Test-Path ".env.example") {
+    Write-Host "✅ .env.example" -ForegroundColor Green
 } else {
-    Write-Host "❌ docker-compose.yml" -ForegroundColor Red
+    Write-Host "❌ .env.example" -ForegroundColor Red
 }
 
 # Verificar package.json

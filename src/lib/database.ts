@@ -1,35 +1,34 @@
-import { Pool } from 'pg';
+import Database from 'better-sqlite3';
+import path from 'path';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set in the environment variables. Please provide it in your .env file.');
+if (!process.env.DB_PATH) {
+  throw new Error('DB_PATH is not set in the environment variables. Please provide it in your .env file.');
 }
 
-// Create a connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+// Create database connection
+const dbPath = path.resolve(process.env.DB_PATH);
+const db = new Database(dbPath);
 
-// Test the connection
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
-});
+// Enable foreign keys
+db.pragma('foreign_keys = ON');
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+console.log(`Connected to SQLite database at: ${dbPath}`);
 
-export { pool };
+export { db };
 
 // Database helper functions
-export const query = async (text: string, params?: any[]) => {
+export const query = (sql: string, params?: any[]) => {
   const start = Date.now();
   try {
-    const res = await pool.query(text, params);
+    let result;
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      result = db.prepare(sql).all(params || []);
+    } else {
+      result = db.prepare(sql).run(params || []);
+    }
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
-    return res;
+    console.log('Executed query', { sql: sql.substring(0, 100), duration, changes: result.changes || result.length });
+    return result;
   } catch (error) {
     console.error('Database query error:', error);
     throw error;
@@ -37,62 +36,75 @@ export const query = async (text: string, params?: any[]) => {
 };
 
 // Initialize database tables
-export const initializeDatabase = async () => {
+export const initializeDatabase = () => {
   try {
-    // Users table (already exists with UUID)
-    await query(`
+    // Users table
+    db.exec(`
       CREATE TABLE IF NOT EXISTS users (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        username TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
     // Tasks table
-    await query(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS tasks (
-        id SERIAL PRIMARY KEY,
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
         content TEXT NOT NULL,
-        board_id VARCHAR(50) NOT NULL,
+        board_id TEXT NOT NULL,
         task_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
     // Goals table
-    await query(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS goals (
-        id SERIAL PRIMARY KEY,
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
         content TEXT NOT NULL,
-        board_id VARCHAR(50) NOT NULL,
+        board_id TEXT NOT NULL,
         goal_order INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
     // Calendar events table
-    await query(`
+    db.exec(`
       CREATE TABLE IF NOT EXISTS calendar_events (
-        id SERIAL PRIMARY KEY,
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        title VARCHAR(255) NOT NULL,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
         description TEXT,
-        start_date TIMESTAMP NOT NULL,
-        end_date TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        start_date DATETIME NOT NULL,
+        end_date DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
-    console.log('Database tables initialized successfully');
+    console.log('SQLite database tables initialized successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
   }
 };
+
+// Initialize database on import
+initializeDatabase();
+
+// Graceful shutdown
+process.on('exit', () => db.close());
+process.on('SIGHUP', () => process.exit(128 + 1));
+process.on('SIGINT', () => process.exit(128 + 2));
+process.on('SIGTERM', () => process.exit(128 + 15));

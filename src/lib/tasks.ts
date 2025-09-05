@@ -4,15 +4,15 @@ import type { Task, Board, BoardName, ItemType } from '@/types';
 // Task management functions
 export const getTasks = async (userId: string): Promise<Task[]> => {
   try {
-    const result = await query(
-        'SELECT id, description as content, board_id as "boardId", task_order as "order", created_at as "createdAt" FROM tasks WHERE user_id = $1 ORDER BY task_order ASC',
+    const result = query(
+        'SELECT id, content, board_id as "boardId", task_order as "order", created_at as "createdAt" FROM tasks WHERE user_id = ? ORDER BY task_order ASC',
         [userId]
-      );
+      ) as any[];
 
-    return result.rows.map(row => ({
+    return result.map(row => ({
       ...row,
       id: row.id.toString(),
-      createdAt: row.createdAt.toISOString(),
+      createdAt: new Date(row.createdAt).toISOString(),
     }));
   } catch (error) {
     console.error('Error fetching tasks:', error);
@@ -22,15 +22,15 @@ export const getTasks = async (userId: string): Promise<Task[]> => {
 
 export const getGoals = async (userId: string): Promise<Task[]> => {
   try {
-    const result = await query(
-        'SELECT id, description as content, board_id as "boardId", goal_order as "order", created_at as "createdAt" FROM goals WHERE user_id = $1 ORDER BY goal_order ASC',
+    const result = query(
+        'SELECT id, content, board_id as "boardId", goal_order as "order", created_at as "createdAt" FROM goals WHERE user_id = ? ORDER BY goal_order ASC',
         [userId]
-      );
+      ) as any[];
 
-    return result.rows.map(row => ({
+    return result.map(row => ({
       ...row,
       id: row.id.toString(),
-      createdAt: row.createdAt.toISOString(),
+      createdAt: new Date(row.createdAt).toISOString(),
     }));
   } catch (error) {
     console.error('Error fetching goals:', error);
@@ -40,27 +40,44 @@ export const getGoals = async (userId: string): Promise<Task[]> => {
 
 export const createTask = async (userId: string, content: string, boardId: BoardName, type: ItemType): Promise<Task> => {
   try {
+    console.log(`Creating ${type} for user:`, userId, 'content:', content, 'boardId:', boardId);
+    
+    // Verify user exists
+    const userExists = query('SELECT id FROM users WHERE id = ?', [userId]) as any[];
+    console.log('User exists check:', userExists.length > 0, 'userId:', userId);
+    
+    if (userExists.length === 0) {
+      throw new Error(`User with id ${userId} does not exist`);
+    }
+    
     const tableName = type === 'task' ? 'tasks' : 'goals';
     
     // Get the current max order for this board
     const orderColumn = type === 'task' ? 'task_order' : 'goal_order';
-    const maxOrderResult = await query(
-        `SELECT COALESCE(MAX(${orderColumn}), 0) as max_order FROM ${tableName} WHERE user_id = $1 AND board_id = $2`,
+    const maxOrderResult = query(
+        `SELECT COALESCE(MAX(${orderColumn}), 0) as max_order FROM ${tableName} WHERE user_id = ? AND board_id = ?`,
         [userId, boardId]
-      );
+      ) as any[];
     
-    const newOrder = maxOrderResult.rows[0].max_order + 1;
+    const newOrder = maxOrderResult[0].max_order + 1;
     
-    const result = await query(
-      `INSERT INTO ${tableName} (user_id, title, description, board_id, ${orderColumn}) VALUES ($1, $2, $3, $4, $5) RETURNING id, title, description as content, board_id as "boardId", ${orderColumn} as "order", created_at as "createdAt"`,
-      [userId, content, content, boardId, newOrder]
-    );
+    console.log(`Inserting into ${tableName}:`, { userId, content, boardId, newOrder });
+    const result = query(
+      `INSERT INTO ${tableName} (user_id, content, board_id, ${orderColumn}) VALUES (?, ?, ?, ?)`,
+      [userId, content, boardId, newOrder]
+    ) as any;
 
-    const newTask = result.rows[0];
+    // Get the created task
+    const createdTask = query(
+      `SELECT id, content, board_id as "boardId", ${orderColumn} as "order", created_at as "createdAt" FROM ${tableName} WHERE id = ?`,
+      [result.lastInsertRowid]
+    ) as any[];
+
+    const newTask = createdTask[0];
     return {
       ...newTask,
       id: newTask.id.toString(),
-      createdAt: newTask.createdAt.toISOString(),
+      createdAt: new Date(newTask.createdAt).toISOString(),
     };
   } catch (error) {
     console.error('Error creating task:', error);
@@ -93,8 +110,8 @@ export const updateTask = async (userId: string, taskId: string, content: string
   try {
     const tableName = type === 'task' ? 'tasks' : 'goals';
     
-    await query(
-      `UPDATE ${tableName} SET description = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3`,
+    query(
+      `UPDATE ${tableName} SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
       [content, taskId, userId]
     );
   } catch (error) {
@@ -107,8 +124,8 @@ export const deleteTask = async (userId: string, taskId: string, type: ItemType)
   try {
     const tableName = type === 'task' ? 'tasks' : 'goals';
     
-    await query(
-      `DELETE FROM ${tableName} WHERE id = $1 AND user_id = $2`,
+    query(
+      `DELETE FROM ${tableName} WHERE id = ? AND user_id = ?`,
       [taskId, userId]
     );
   } catch (error) {
@@ -122,8 +139,8 @@ export const moveTask = async (userId: string, taskId: string, newBoardId: Board
     const tableName = type === 'task' ? 'tasks' : 'goals';
     const orderColumn = type === 'task' ? 'task_order' : 'goal_order';
     
-    await query(
-      `UPDATE ${tableName} SET board_id = $1, ${orderColumn} = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND user_id = $4`,
+    query(
+      `UPDATE ${tableName} SET board_id = ?, ${orderColumn} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
       [newBoardId, newOrder, taskId, userId]
     );
   } catch (error) {
@@ -139,8 +156,8 @@ export const reorderTasks = async (userId: string, boardId: BoardName, taskIds: 
     
     // Update order for each task
     for (let i = 0; i < taskIds.length; i++) {
-      await query(
-        `UPDATE ${tableName} SET ${orderColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND user_id = $3`,
+      query(
+        `UPDATE ${tableName} SET ${orderColumn} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
         [i, taskIds[i], userId]
       );
     }

@@ -401,7 +401,7 @@ export default function KanbanPage() {
     }
     
     // The state is already updated optimistically by onDragOver.
-    // Now, persist the changes to PostgreSQL.
+    // Now, persist the changes to SQLite.
     try {
       // Prepare task updates for reordering
       const taskUpdates = destinationBoardOnDragEnd.tasks.map((task, index) => ({

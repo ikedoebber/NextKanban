@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { getGoals, createGoal, updateGoal, deleteGoal, moveGoal, reorderGoals } from '@/lib/tasks';
+import { z } from 'zod';
+
+// Validation schemas
+const createGoalSchema = z.object({
+  content: z.string()
+    .min(1, 'Goal content is required')
+    .max(500, 'Goal content must be less than 500 characters')
+    .trim(),
+  boardId: z.string()
+    .min(1, 'Board ID is required')
+});
+
+const updateGoalSchema = z.object({
+  goalId: z.string()
+    .min(1, 'Goal ID is required'),
+  content: z.string()
+    .min(1, 'Goal content is required')
+    .max(500, 'Goal content must be less than 500 characters')
+    .trim()
+});
+
+const deleteGoalSchema = z.object({
+  goalId: z.string()
+    .min(1, 'Goal ID is required')
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,16 +45,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await verifyToken(request);
+    console.log('Goals POST - User from verifyToken:', user);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { content, boardId } = await request.json();
+    const body = await request.json();
+    console.log('Goals POST - Request body:', body);
     
-    if (!content || !boardId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate input with Zod
+    const validation = createGoalSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      }, { status: 400 });
     }
 
+    const { content, boardId } = validation.data;
+    console.log('Goals POST - Calling createGoal with userId:', user.id, 'content:', content, 'boardId:', boardId);
     const goal = await createGoal(user.id, content, boardId);
     return NextResponse.json(goal);
   } catch (error) {
@@ -45,12 +79,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { goalId, content } = await request.json();
+    const body = await request.json();
     
-    if (!goalId || !content) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate input with Zod
+    const validation = updateGoalSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      }, { status: 400 });
     }
 
+    const { goalId, content } = validation.data;
     await updateGoal(user.id, goalId, content);
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -69,11 +109,17 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const goalId = searchParams.get('goalId');
     
-    if (!goalId) {
-      return NextResponse.json({ error: 'Missing goalId parameter' }, { status: 400 });
+    // Validate input with Zod
+    const validation = deleteGoalSchema.safeParse({ goalId });
+    if (!validation.success) {
+      return NextResponse.json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      }, { status: 400 });
     }
 
-    await deleteGoal(user.id, goalId);
+    const { goalId: validatedGoalId } = validation.data;
+    await deleteGoal(user.id, validatedGoalId);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting goal:', error);

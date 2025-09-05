@@ -4,43 +4,37 @@ import { query } from '@/lib/database';
 export async function GET(request: NextRequest) {
   try {
     // Check if users table exists and get its structure
-    const usersTableInfo = await query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'users' 
-      ORDER BY ordinal_position;
+    const usersTableInfo = query(`
+      PRAGMA table_info(users);
     `);
 
     // Check tasks table structure
-    const tasksTableInfo = await query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'tasks' 
-      ORDER BY ordinal_position;
+    const tasksTableInfo = query(`
+      PRAGMA table_info(tasks);
     `);
 
     // Check goals table structure
-    const goalsTableInfo = await query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'goals' 
-      ORDER BY ordinal_position;
+    const goalsTableInfo = query(`
+      PRAGMA table_info(goals);
     `);
 
-    // Check if other tables exist
-    const tablesInfo = await query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_type = 'BASE TABLE';
+    // Check calendar_events table structure
+    const calendarTableInfo = query(`
+      PRAGMA table_info(calendar_events);
+    `);
+
+    // Check if tables exist
+    const tablesInfo = query(`
+      SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';
     `);
 
     return NextResponse.json({ 
       success: true,
-      tables: tablesInfo.rows,
-      usersTableStructure: usersTableInfo.rows,
-      tasksTableStructure: tasksTableInfo.rows,
-      goalsTableStructure: goalsTableInfo.rows
+      tables: tablesInfo,
+      usersTableStructure: usersTableInfo,
+      tasksTableStructure: tasksTableInfo,
+      goalsTableStructure: goalsTableInfo,
+      calendarTableStructure: calendarTableInfo
     });
   } catch (error) {
     console.error('Error checking database:', error);

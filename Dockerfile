@@ -1,88 +1,27 @@
-# ===============================
-# 1. Dependências
-# ===============================
-FROM node:20-slim AS deps
+FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b35d89fcf3cc8e44a8def9 AS deps
 WORKDIR /app
-
-# Instala dependências do sistema necessárias
-RUN apt-get update && apt-get install -y python3 make g++ git curl && rm -rf /var/lib/apt/lists/*
-
-# Copia package.json e package-lock.json e instala todas dependências
+RUN apk add --no-cache dumb-init
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --only=production && npm cache clean --force
 
-# ===============================
-# 2. Build da aplicação
-# ===============================
-FROM node:20-slim AS builder
+FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b35d89fcf3cc8e44a8def9 AS builder
 WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
+RUN apk add --no-cache python3 make g++
+COPY package.json package-lock.json* ./
+RUN npm ci && npm cache clean --force
 COPY . .
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Recebe secrets via build-args
-ARG NEXT_PUBLIC_FIREBASE_API_KEY
-ARG GEMINI_API_KEY
-ARG DATABASE_URL
-ARG DB_HOST
-ARG DB_PORT
-ARG DB_NAME
-ARG DB_USER
-ARG DB_PASSWORD
-ARG NEXTAUTH_SECRET
-ARG NEXTAUTH_URL
-ARG JWT_SECRET
-ARG GIT_SHA
-
-# Define variáveis de ambiente
-ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY
-ENV GEMINI_API_KEY=$GEMINI_API_KEY
-ENV DATABASE_URL=$DATABASE_URL
-ENV DB_HOST=$DB_HOST
-ENV DB_PORT=$DB_PORT
-ENV DB_NAME=$DB_NAME
-ENV DB_USER=$DB_USER
-ENV DB_PASSWORD=$DB_PASSWORD
-ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
-ENV NEXTAUTH_URL=$NEXTAUTH_URL
-ENV JWT_SECRET=$JWT_SECRET
-
-# Garante que a pasta public existe
-RUN mkdir -p public
-
-# Build da aplicação
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# ===============================
-# 3. Imagem final para produção
-# ===============================
-FROM node:20-slim AS runner
+FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b35d89fcf3cc8e44a8def9 AS runner
 WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=48321
-
-# Cria usuário não-root
-RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs
-
-# Copia arquivos essenciais do build
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
-COPY --from=builder /app/node_modules ./node_modules
-
-# Instala apenas dependências de produção (caso necessário)
-RUN npm ci --omit=dev --ignore-scripts || true
-
-# Executa como usuário não-root
+ENV NODE_ENV=production PORT=48321
+RUN apk add --no-cache dumb-init
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 -G nodejs
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 USER nextjs
-
-# Porta que o Next irá rodar
 EXPOSE 48321
-
-# Start da aplicação
-CMD ["npm", "run", "start", "--", "-p", "48321"]
+CMD ["dumb-init", "next", "start", "-p", "48321"]

@@ -21,11 +21,11 @@ Este projeto foi construído com um conjunto de tecnologias modernas e performá
 - **Linguagem:** [TypeScript](https://www.typescriptlang.org/)
 - **Estilização:** [Tailwind CSS](https://tailwindcss.com/)
 - **Componentes UI:** [shadcn/ui](https://ui.shadcn.com/)
-- **Banco de Dados:** [PostgreSQL](https://www.postgresql.org/)
+- **Banco de Dados:** [SQLite](https://www.sqlite.org/) com [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
 - **Autenticação:** Sistema customizado com JWT
 - **Funcionalidades de IA:** [Google Gemini AI](https://ai.google.dev/) via [Genkit](https://firebase.google.com/docs/genkit)
 - **Drag and Drop:** [dnd-kit](https://dndkit.com/)
-- **Containerização:** [Docker](https://www.docker.com/)
+- **Containerização:** [Docker](https://www.docker.com/) (opcional)
 
 ## ⚙️ Como Começar
 
@@ -33,9 +33,8 @@ Siga os passos abaixo para executar o projeto em seu ambiente local.
 
 ### Pré-requisitos
 
-- [Node.js](https://nodejs.org/en/) (versão 20.x ou superior)
-- [Docker](https://www.docker.com/) e Docker Compose
-- [PostgreSQL](https://www.postgresql.org/) (ou use Docker)
+- [Node.js](https://nodejs.org/en/) (versão 18.x ou superior)
+- [Docker](https://www.docker.com/) (opcional, apenas para containerização)
 
 ### 1. Instalação
 
@@ -48,25 +47,20 @@ git clone <URL_DO_REPOSITORIO>
 # Navegue até o diretório do projeto
 cd NextKanban
 
-# Instale as dependências
+# Instale as dependências (o banco SQLite será inicializado automaticamente)
 npm install
 ```
 
 ### 2. Configuração do Banco de Dados
 
-#### Opção A: Usando Docker (Recomendado)
+O banco de dados SQLite é configurado automaticamente durante a instalação das dependências. O arquivo do banco será criado em `./data/nextkanban.db`.
+
+#### Inicialização Manual (se necessário)
 
 ```bash
-# Inicie o PostgreSQL com Docker
-docker-compose -f docker-compose.postgres.yml up -d
+# Execute o script de inicialização do banco
+npm run init-db
 ```
-
-#### Opção B: PostgreSQL Local
-
-1. Instale o PostgreSQL em sua máquina
-2. Execute o script de configuração:
-   - **Windows:** `./setup_postgres.ps1`
-   - **Linux/Mac:** Execute os comandos do arquivo `setup_postgres.sql`
 
 ### 3. Variáveis de Ambiente
 
@@ -82,8 +76,8 @@ Edite o arquivo `.env` e configure:
 # Chave da API do Google Gemini (obrigatória para IA)
 GEMINI_API_KEY=sua-chave-do-gemini-aqui
 
-# Configuração do PostgreSQL
-DATABASE_URL=postgresql://nextkanban_user:nextkanban_password@localhost:5432/nextkanban
+# Configuração do SQLite
+DB_PATH=./data/nextkanban.db
 
 # Secrets de autenticação (gere strings aleatórias de 32+ caracteres)
 NEXTAUTH_SECRET=seu-secret-aqui
@@ -105,15 +99,12 @@ Abra [http://localhost:48321](http://localhost:48321) em seu navegador para ver 
 2. Crie sua conta com nome de usuário e senha
 3. Faça login e comece a usar o sistema!
 
-## 🐳 Docker
+## 🐳 Docker (Opcional)
 
-### Desenvolvimento com Docker
+### Desenvolvimento Local
 
 ```bash
-# Inicie apenas o PostgreSQL
-docker-compose -f docker-compose.dev.yml up -d
-
-# Execute a aplicação localmente
+# Execute a aplicação localmente (recomendado)
 npm run dev
 ```
 
@@ -123,19 +114,46 @@ npm run dev
 # Build da imagem
 docker build -t nextkanban .
 
-# Execute com docker-compose (inclui PostgreSQL)
-docker-compose up -d
+# Execute o container
+docker run -d \
+  --name nextkanban \
+  -p 48321:48321 \
+  -v $(pwd)/data:/app/data \
+  -e NEXTAUTH_SECRET=seu-secret-aqui \
+  -e JWT_SECRET=seu-jwt-secret-aqui \
+  -e GEMINI_API_KEY=sua-chave-do-gemini \
+  nextkanban
+```
+
+### Deploy com Volume Persistente
+
+```bash
+# Criar volume para dados
+docker volume create nextkanban-data
+
+# Executar com volume
+docker run -d \
+  --name nextkanban \
+  -p 48321:48321 \
+  -v nextkanban-data:/app/data \
+  -e NEXTAUTH_SECRET=seu-secret-aqui \
+  -e JWT_SECRET=seu-jwt-secret-aqui \
+  -e GEMINI_API_KEY=sua-chave-do-gemini \
+  nextkanban
 ```
 
 ## 🚀 Deploy
 
 Para fazer o deploy desta aplicação:
 
-1. **Vercel/Netlify:** Configure as variáveis de ambiente e conecte um banco PostgreSQL
-2. **Docker:** Use o Dockerfile incluído para containerização
-3. **Firebase App Hosting:** Configure o `apphosting.yaml` incluído
+1. **Vercel/Netlify:** Configure as variáveis de ambiente e faça upload do banco SQLite ou use um volume persistente
+2. **Docker:** Use o Dockerfile incluído para containerização com volumes para persistência de dados
+3. **VPS/Servidor:** Execute diretamente com Node.js, garantindo que o diretório `data` tenha permissões de escrita
 
-Lembre-se de configurar todas as variáveis de ambiente na plataforma de sua escolha.
+Lembre-se de:
+- Configurar todas as variáveis de ambiente na plataforma de sua escolha
+- Garantir que o diretório de dados tenha permissões adequadas
+- Fazer backup regular do arquivo `nextkanban.db`
 
 ## 🤖 Configuração da IA
 
@@ -144,3 +162,38 @@ Para usar as funcionalidades de IA:
 1. Obtenha uma chave da API do Google Gemini em [Google AI Studio](https://aistudio.google.com/)
 2. Configure a variável `GEMINI_API_KEY` no seu arquivo `.env`
 3. A IA estará disponível no botão "Sugestão IA" nos quadros Kanban
+
+## 📁 Estrutura do Banco de Dados
+
+O SQLite cria automaticamente as seguintes tabelas:
+
+- **users**: Gerenciamento de usuários e autenticação
+- **tasks**: Tarefas do quadro Kanban
+- **goals**: Metas de longo prazo
+- **calendar_events**: Eventos do calendário semanal
+
+## 🔧 Comandos Úteis
+
+```bash
+# Desenvolvimento
+npm run dev          # Inicia servidor de desenvolvimento
+npm run build        # Build para produção
+npm start           # Inicia servidor de produção
+npm run lint        # Executa linting
+npm run typecheck   # Verifica tipos TypeScript
+
+# Banco de dados
+npm run init-db     # Inicializa/reinicializa o banco SQLite
+
+# Docker
+docker logs nextkanban              # Ver logs do container
+docker exec -it nextkanban sh       # Acessar shell do container
+docker cp nextkanban:/app/data/nextkanban.db ./backup.db  # Backup do banco
+```
+
+## 📝 Notas Importantes
+
+- O arquivo do banco SQLite (`nextkanban.db`) contém todos os seus dados
+- Faça backups regulares do arquivo de banco, especialmente antes de atualizações
+- Em produção, certifique-se de que o diretório `data` tenha permissões adequadas
+- Para desenvolvimento, o banco é criado automaticamente na primeira execução

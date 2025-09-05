@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { getTasks, createTask, updateTask, deleteTask, moveTask, reorderTasks } from '@/lib/tasks';
+import { z } from 'zod';
+
+// Validation schemas
+const createTaskSchema = z.object({
+  content: z.string().min(1, 'Content is required').max(500, 'Content too long'),
+  boardId: z.string().min(1, 'Board ID is required'),
+  type: z.enum(['task', 'goal'], { required_error: 'Type must be task or goal' })
+});
+
+const updateTaskSchema = z.object({
+  taskId: z.string().min(1, 'Task ID is required'),
+  content: z.string().min(1, 'Content is required').max(500, 'Content too long'),
+  type: z.enum(['task', 'goal'], { required_error: 'Type must be task or goal' })
+});
+
+const deleteTaskSchema = z.object({
+  taskId: z.string().min(1, 'Task ID is required'),
+  type: z.enum(['task', 'goal'], { required_error: 'Type must be task or goal' })
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,12 +43,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { content, boardId, type } = await request.json();
+    const body = await request.json();
     
-    if (!content || !boardId || !type) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate input with Zod
+    const validation = createTaskSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ 
+        error: 'Validation failed', 
+        details: validation.error.errors 
+      }, { status: 400 });
     }
 
+    const { content, boardId, type } = validation.data;
     const task = await createTask(user.id, content, boardId, type);
     return NextResponse.json(task);
   } catch (error) {
@@ -45,12 +70,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { taskId, content, type } = await request.json();
+    const body = await request.json();
     
-    if (!taskId || !content || !type) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    // Validate input with Zod
+    const validation = updateTaskSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ 
+        error: 'Validation failed', 
+        details: validation.error.errors 
+      }, { status: 400 });
     }
 
+    const { taskId, content, type } = validation.data;
     await updateTask(user.id, taskId, content, type);
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -67,14 +98,22 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const taskId = searchParams.get('taskId');
-    const type = searchParams.get('type');
+    const params = {
+      taskId: searchParams.get('taskId'),
+      type: searchParams.get('type')
+    };
     
-    if (!taskId || !type) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
+    // Validate query parameters with Zod
+    const validation = deleteTaskSchema.safeParse(params);
+    if (!validation.success) {
+      return NextResponse.json({ 
+        error: 'Validation failed', 
+        details: validation.error.errors 
+      }, { status: 400 });
     }
 
-    await deleteTask(user.id, taskId, type as 'task' | 'goal');
+    const { taskId, type } = validation.data;
+    await deleteTask(user.id, taskId, type);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting task:', error);
