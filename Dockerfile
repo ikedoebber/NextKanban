@@ -2,7 +2,7 @@ FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b3
 WORKDIR /app
 RUN apk add --no-cache dumb-init
 COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b35d89fcf3cc8e44a8def9 AS builder
 WORKDIR /app
