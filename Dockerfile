@@ -2,7 +2,7 @@ FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b3
 WORKDIR /app
 RUN apk add --no-cache dumb-init python3 make g++
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 FROM node:20.11.1-alpine3.19@sha256:c13b26e7e602ef2f1074aef304ce6e9b7dd284c419b35d89fcf3cc8e44a8def9 AS builder
 WORKDIR /app
@@ -22,6 +22,9 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/init-sqlite.js ./init-sqlite.js
+RUN mkdir -p data && chown nextjs:nodejs data
 USER nextjs
+RUN node init-sqlite.js
 EXPOSE 48321
 CMD ["dumb-init", "next", "start", "-p", "48321"]
